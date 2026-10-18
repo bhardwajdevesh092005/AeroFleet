@@ -31,12 +31,16 @@ namespace MathUtils {
         return radians * (180.0 / PI);
     }
 
+    constexpr double absVal(double val) noexcept {
+        return (val < 0.0) ? -val : val;
+    }
+
     constexpr bool isZero(double val, double eps = EPSILON) noexcept {
-        return std::abs(val) <= eps;
+        return absVal(val) <= eps;
     }
 
     constexpr bool areEqual(double a, double b, double eps = EPSILON) noexcept {
-        return std::abs(a - b) <= eps;
+        return absVal(a - b) <= eps;
     }
 
     /**
