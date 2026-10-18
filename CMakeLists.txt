@@ -29,12 +29,17 @@ endif()
 # Find raylib (using CMake config package or PkgConfig fallback)
 find_package(raylib QUIET)
 if(NOT raylib_FOUND)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(RAYLIB REQUIRED raylib)
-    add_library(raylib INTERFACE IMPORTED)
-    target_include_directories(raylib INTERFACE ${RAYLIB_INCLUDE_DIRS})
-    target_link_libraries(raylib INTERFACE ${RAYLIB_LIBRARIES})
-    target_link_directories(raylib INTERFACE ${RAYLIB_LIBRARY_DIRS})
+    find_package(PkgConfig QUIET)
+    if(PKG_CONFIG_FOUND)
+        pkg_check_modules(RAYLIB QUIET raylib)
+        if(RAYLIB_FOUND)
+            add_library(raylib INTERFACE IMPORTED)
+            target_include_directories(raylib INTERFACE ${RAYLIB_INCLUDE_DIRS})
+            target_link_libraries(raylib INTERFACE ${RAYLIB_LIBRARIES})
+            target_link_directories(raylib INTERFACE ${RAYLIB_LIBRARY_DIRS})
+            set(raylib_FOUND TRUE)
+        endif()
+    endif()
 endif()
 
 # Global include directories
@@ -51,15 +56,19 @@ target_include_directories(AeroFleetCore PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp
 )
 
-# Main simulation executable
-add_executable(AeroFleet
-    cpp/main.cpp
-)
+# Main simulation executable (built when raylib is available)
+if(raylib_FOUND)
+    add_executable(AeroFleet
+        cpp/main.cpp
+    )
 
-target_link_libraries(AeroFleet PRIVATE
-    AeroFleetCore
-    raylib
-)
+    target_link_libraries(AeroFleet PRIVATE
+        AeroFleetCore
+        raylib
+    )
+else()
+    message(STATUS "raylib not found; skipping AeroFleet GUI executable. AeroFleetCore and all tests are enabled.")
+endif()
 
 # Enable testing harness
 enable_testing()
