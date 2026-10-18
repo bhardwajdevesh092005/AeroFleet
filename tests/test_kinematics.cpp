@@ -174,8 +174,8 @@ void test_ground_collision_floor() {
     // Drone 1 meter above ground, moving down fast
     UAVState uav(7, Vec3(0.0, 0.0, 1.0));
 
-    // Steer hard downwards
-    for (int i = 0; i < 20; ++i) {
+    // Steer hard downwards: 100 steps (2.0 seconds) ensures drone reaches floor under bounded acceleration
+    for (int i = 0; i < 100; ++i) {
         integrator.stepVelocity(uav, Vec3(0.0, 0.0, -10.0), 0.02);
     }
 
