@@ -44,6 +44,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cpp)
 add_library(AeroFleetCore STATIC
     cpp/core/Config.cpp
     cpp/world/WorldGenerator.cpp
+    cpp/physics/Kinematics.cpp
 )
 
 target_include_directories(AeroFleetCore PUBLIC
@@ -86,3 +87,11 @@ add_executable(test_world_generation
 target_link_libraries(test_world_generation PRIVATE AeroFleetCore)
 add_test(NAME WorldGenerationTests COMMAND test_world_generation)
 set_tests_properties(WorldGenerationTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: UAV Rigid Kinematics & Motion Integration
+add_executable(test_kinematics
+    tests/test_kinematics.cpp
+)
+target_link_libraries(test_kinematics PRIVATE AeroFleetCore)
+add_test(NAME KinematicsTests COMMAND test_kinematics)
+set_tests_properties(KinematicsTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
