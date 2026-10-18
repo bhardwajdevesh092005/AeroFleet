@@ -16,9 +16,9 @@ Each major development step is broken down into granular sub-parts and documente
 
 | Step | Title | Status | Log Reference |
 | :---: | :--- | :---: | :--- |
-| **01** | Project Build System, Dependencies & Central Configuration | **COMPLETED** | [step_01_build_and_configuration.md](file:///mnt/c/Users/deves/Desktop/AeroFleet/progress_logs/step_01_build_and_configuration.md) |
-| **02** | 3D Vector Math, Spatial Primitives & Bounding Volumes | **COMPLETED** | [step_02_math_and_geometry.md](file:///mnt/c/Users/deves/Desktop/AeroFleet/progress_logs/step_02_math_and_geometry.md) |
-| **03** | Procedural City Map Generator & World Representation | **COMPLETED** | [step_03_world_generator.md](file:///mnt/c/Users/deves/Desktop/AeroFleet/progress_logs/step_03_world_generator.md) |
+| **01** | Project Build System, Dependencies & Central Configuration | **COMPLETED** | [step_01_build_and_configuration.md](step_01_build_and_configuration.md) |
+| **02** | 3D Vector Math, Spatial Primitives & Bounding Volumes | **COMPLETED** | [step_02_math_and_geometry.md](step_02_math_and_geometry.md) |
+| **03** | Procedural City Map Generator & World Representation | **COMPLETED** | [step_03_world_generator.md](step_03_world_generator.md) |
 | **04** | UAV Rigid Kinematics & Motion Integrator | **COMPLETED** | [step_04_kinematics.md](step_04_kinematics.md) |
 | **05** | Continuous Collision Detection (CCD) & Conflict Resolution | *PENDING* | - |
 | **06** | High-Fidelity Battery, Energy & Charging Station Mechanics | *PENDING* | - |
