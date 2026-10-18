@@ -43,6 +43,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cpp)
 # Core simulation static library
 add_library(AeroFleetCore STATIC
     cpp/core/Config.cpp
+    cpp/world/WorldGenerator.cpp
 )
 
 target_include_directories(AeroFleetCore PUBLIC
@@ -62,14 +63,26 @@ target_link_libraries(AeroFleet PRIVATE
 # Enable testing harness
 enable_testing()
 
-# Unit tests
+# Unit tests: Configuration
 add_executable(test_config
     tests/test_config.cpp
 )
-
-target_link_libraries(test_config PRIVATE
-    AeroFleetCore
-)
-
+target_link_libraries(test_config PRIVATE AeroFleetCore)
 add_test(NAME ConfigTests COMMAND test_config)
 set_tests_properties(ConfigTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: Math and Spatial Geometry
+add_executable(test_math_geometry
+    tests/test_math_geometry.cpp
+)
+target_link_libraries(test_math_geometry PRIVATE AeroFleetCore)
+add_test(NAME MathGeometryTests COMMAND test_math_geometry)
+set_tests_properties(MathGeometryTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: World Generation and Spatial Broadphase
+add_executable(test_world_generation
+    tests/test_world_generation.cpp
+)
+target_link_libraries(test_world_generation PRIVATE AeroFleetCore)
+add_test(NAME WorldGenerationTests COMMAND test_world_generation)
+set_tests_properties(WorldGenerationTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
