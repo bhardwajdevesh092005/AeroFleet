@@ -1,5 +1,4 @@
 #include "physics/Kinematics.hpp"
-#include <algorithm>
 #include <cmath>
 
 namespace aerofleet {
