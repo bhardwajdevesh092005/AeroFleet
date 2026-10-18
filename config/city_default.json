@@ -1,0 +1,22 @@
+{
+  "city": {
+    "name": "Downtown Metro Grid",
+    "grid_blocks_x": 6,
+    "grid_blocks_y": 6,
+    "block_size_meters": 120.0,
+    "street_width_meters": 30.0,
+    "min_building_height": 20.0,
+    "max_building_height": 90.0
+  },
+  "stores": [
+    { "id": 1, "name": "North Hub", "x": -250.0, "y": 300.0, "z": 0.0 },
+    { "id": 2, "name": "Central Hub", "x": 0.0, "y": 0.0, "z": 0.0 },
+    { "id": 3, "name": "South Hub", "x": 250.0, "y": -300.0, "z": 0.0 }
+  ],
+  "charging_stations": [
+    { "id": 1, "name": "Dock Alpha", "x": -240.0, "y": 290.0, "z": 0.0, "capacity": 4 },
+    { "id": 2, "name": "Dock Beta", "x": 10.0, "y": 10.0, "z": 0.0, "capacity": 4 },
+    { "id": 3, "name": "Dock Gamma", "x": 260.0, "y": -290.0, "z": 0.0, "capacity": 4 }
+  ]
+}
+
