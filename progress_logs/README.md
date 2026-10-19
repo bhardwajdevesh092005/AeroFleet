@@ -28,7 +28,7 @@ Each major development step is broken down into granular sub-parts and documente
 | **10** | Central Heuristic Dispatcher / Coordinator Baseline | **COMPLETED** | [step_10_heuristic_coordinator.md](step_10_heuristic_coordinator.md) |
 | **11** | Real-Time 3D Visualization Engine (raylib) & Live HUD | **COMPLETED** | [step_11_visualization.md](step_11_visualization.md) |
 | **12** | High-Speed Simulation Runner, Telemetry & Metrics Recorder | **COMPLETED** | [step_12_telemetry_and_runner.md](step_12_telemetry_and_runner.md) |
-| **13** | pybind11 C++ Simulator Bindings | *PENDING* | - |
+| **13** | pybind11 C++ Simulator Bindings | **COMPLETED** | [step_13_pybind11_bindings.md](step_13_pybind11_bindings.md) |
 | **14** | Gymnasium Navigation Environment (AeroFleetNavEnv) | *PENDING* | - |
 | **15** | Cross-Language Differential Physics & Seed Reproducibility | *PENDING* | - |
 | **16** | Navigation Policy Training (PPO) & Curriculum Learning | *PENDING* | - |

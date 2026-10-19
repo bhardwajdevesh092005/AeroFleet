@@ -6,6 +6,7 @@ project(AeroFleet VERSION 0.1.0 LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Export compile commands for language servers
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -64,6 +65,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cpp)
 # Core simulation static library
 add_library(AeroFleetCore STATIC
     cpp/core/Config.cpp
+    cpp/core/Simulator.cpp
     cpp/world/WorldGenerator.cpp
     cpp/physics/Kinematics.cpp
     cpp/physics/CollisionSystem.cpp
@@ -205,5 +207,52 @@ add_executable(test_reproducibility
 target_link_libraries(test_reproducibility PRIVATE AeroFleetCore)
 add_test(NAME ReproducibilityTests COMMAND test_reproducibility)
 set_tests_properties(ReproducibilityTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit and integration tests: Unified Simulator Engine, Observation Extraction & Stepping
+add_executable(test_simulator
+    tests/test_simulator.cpp
+)
+target_link_libraries(test_simulator PRIVATE AeroFleetCore)
+add_test(NAME SimulatorTests COMMAND test_simulator)
+set_tests_properties(SimulatorTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Python pybind11 bindings module
+set(PYBIND11_INC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/include")
+set(PYTHON_INC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/include/python3.14")
+
+if(EXISTS "${PYBIND11_INC_DIR}/pybind11/pybind11.h" AND EXISTS "${PYTHON_INC_DIR}/Python.h")
+    add_library(aerofleet_cpp MODULE
+        python/bindings/aerofleet_bindings.cpp
+    )
+    target_include_directories(aerofleet_cpp SYSTEM PRIVATE
+        ${PYBIND11_INC_DIR}
+        ${PYTHON_INC_DIR}
+    )
+    target_include_directories(aerofleet_cpp PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/cpp
+    )
+    target_link_libraries(aerofleet_cpp PRIVATE
+        AeroFleetCore
+    )
+    set_target_properties(aerofleet_cpp PROPERTIES
+        PREFIX ""
+        SUFFIX ".cpython-314-x86_64-linux-gnu.so"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python"
+    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(aerofleet_cpp PRIVATE -fvisibility=hidden -fPIC)
+    endif()
+
+    find_program(PYTHON_EXECUTABLE python3)
+    if(PYTHON_EXECUTABLE)
+        add_test(NAME PythonBindingTests
+            COMMAND ${PYTHON_EXECUTABLE} tests/test_bindings.py
+        )
+        set_tests_properties(PythonBindingTests PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python:${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/python3/dist-packages;LD_LIBRARY_PATH=${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/x86_64-linux-gnu:${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/x86_64-linux-gnu/blas:${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/x86_64-linux-gnu/lapack"
+        )
+    endif()
+endif()
 
 

@@ -71,3 +71,4 @@ Testing/
 __pycache__/
 .vscode/
 logs/
+third_party/
