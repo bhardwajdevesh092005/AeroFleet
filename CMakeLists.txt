@@ -45,6 +45,7 @@ add_library(AeroFleetCore STATIC
     cpp/core/Config.cpp
     cpp/world/WorldGenerator.cpp
     cpp/physics/Kinematics.cpp
+    cpp/physics/CollisionSystem.cpp
 )
 
 target_include_directories(AeroFleetCore PUBLIC
@@ -95,3 +96,11 @@ add_executable(test_kinematics
 target_link_libraries(test_kinematics PRIVATE AeroFleetCore)
 add_test(NAME KinematicsTests COMMAND test_kinematics)
 set_tests_properties(KinematicsTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: Continuous Collision Detection & Conflict Resolution
+add_executable(test_collision
+    tests/test_collision.cpp
+)
+target_link_libraries(test_collision PRIVATE AeroFleetCore)
+add_test(NAME CollisionTests COMMAND test_collision)
+set_tests_properties(CollisionTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
