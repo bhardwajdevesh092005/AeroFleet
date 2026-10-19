@@ -49,6 +49,8 @@ add_library(AeroFleetCore STATIC
     cpp/physics/BatteryModel.cpp
     cpp/requests/RequestGenerator.cpp
     cpp/fleet/FleetManager.cpp
+    cpp/control/WaypointController.cpp
+    cpp/coordinator/HeuristicCoordinator.cpp
 )
 
 target_include_directories(AeroFleetCore PUBLIC
@@ -131,3 +133,27 @@ add_executable(test_fleet
 target_link_libraries(test_fleet PRIVATE AeroFleetCore)
 add_test(NAME FleetTests COMMAND test_fleet)
 set_tests_properties(FleetTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: Deterministic heuristic waypoint navigation
+add_executable(test_heuristic_nav
+    tests/test_heuristic_nav.cpp
+)
+target_link_libraries(test_heuristic_nav PRIVATE AeroFleetCore)
+add_test(NAME HeuristicNavigationTests COMMAND test_heuristic_nav)
+set_tests_properties(HeuristicNavigationTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: Heuristic fleet coordinator
+add_executable(test_heuristic_coordinator
+    tests/test_heuristic_coordinator.cpp
+)
+target_link_libraries(test_heuristic_coordinator PRIVATE AeroFleetCore)
+add_test(NAME HeuristicCoordinatorTests COMMAND test_heuristic_coordinator)
+set_tests_properties(HeuristicCoordinatorTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Cross-module integration tests: request generation through delivery execution
+add_executable(test_integration
+    tests/test_integration.cpp
+)
+target_link_libraries(test_integration PRIVATE AeroFleetCore)
+add_test(NAME IntegrationTests COMMAND test_integration)
+set_tests_properties(IntegrationTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
