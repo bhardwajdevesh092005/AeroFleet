@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project(AeroFleet VERSION 0.1.0 LANGUAGES CXX C)
 
 # Enforce standard C++20
@@ -26,7 +27,7 @@ else()
     )
 endif()
 
-# Find raylib (using CMake config package or PkgConfig fallback)
+# Find raylib (using CMake config package, PkgConfig, or FetchContent fallback)
 find_package(raylib QUIET)
 if(NOT raylib_FOUND)
     find_package(PkgConfig QUIET)
@@ -40,6 +41,21 @@ if(NOT raylib_FOUND)
             set(raylib_FOUND TRUE)
         endif()
     endif()
+endif()
+
+if(NOT raylib_FOUND)
+    message(STATUS "raylib not found on system; fetching raylib 5.0 via FetchContent...")
+    include(FetchContent)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_GAMES OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        raylib
+        GIT_REPOSITORY https://github.com/raysan5/raylib.git
+        GIT_TAG 5.5
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(raylib)
+    set(raylib_FOUND TRUE)
 endif()
 
 # Global include directories
@@ -56,10 +72,16 @@ add_library(AeroFleetCore STATIC
     cpp/fleet/FleetManager.cpp
     cpp/control/WaypointController.cpp
     cpp/coordinator/HeuristicCoordinator.cpp
+    cpp/visualization/CameraController.cpp
+    cpp/visualization/Renderer.cpp
 )
 
 target_include_directories(AeroFleetCore PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp
+)
+
+target_link_libraries(AeroFleetCore PUBLIC
+    raylib
 )
 
 # Main simulation executable (built when raylib is available)
@@ -166,3 +188,12 @@ add_executable(test_integration
 target_link_libraries(test_integration PRIVATE AeroFleetCore)
 add_test(NAME IntegrationTests COMMAND test_integration)
 set_tests_properties(IntegrationTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit and integration tests: 3D Visualization, Camera Math & Frame-Rate Decoupling
+add_executable(test_visualization
+    tests/test_visualization.cpp
+)
+target_link_libraries(test_visualization PRIVATE AeroFleetCore raylib)
+add_test(NAME VisualizationTests COMMAND test_visualization)
+set_tests_properties(VisualizationTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+

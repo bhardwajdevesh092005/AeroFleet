@@ -35,7 +35,13 @@ void FleetManager::initialize(
         Vec3 spawnPos(0.0, 0.0, defaultAltitude);
         if (!map.chargingStations.empty()) {
             size_t stationIdx = i % map.chargingStations.size();
+            size_t slotIdx = i / map.chargingStations.size();
             spawnPos = map.chargingStations[stationIdx].position;
+            if (slotIdx > 0) {
+                const double angle = static_cast<double>(slotIdx) * (MathUtils::PI * 0.5);
+                spawnPos.x += 1.2 * std::cos(angle);
+                spawnPos.y += 1.2 * std::sin(angle);
+            }
         }
 
         UAVState uav(static_cast<UAVId>(i), spawnPos, 0.0);

@@ -26,7 +26,7 @@ Each major development step is broken down into granular sub-parts and documente
 | **08** | Fleet State Machine & UAV Operational Lifecycle | **COMPLETED** | [step_08_fleet_manager.md](step_08_fleet_manager.md) |
 | **09** | Baseline Heuristic Navigation & Deterministic Waypoint Controller | **COMPLETED** | [step_09_heuristic_navigation.md](step_09_heuristic_navigation.md) |
 | **10** | Central Heuristic Dispatcher / Coordinator Baseline | **COMPLETED** | [step_10_heuristic_coordinator.md](step_10_heuristic_coordinator.md) |
-| **11** | Real-Time 3D Visualization Engine (raylib) & Live HUD | *PENDING* | - |
+| **11** | Real-Time 3D Visualization Engine (raylib) & Live HUD | **COMPLETED** | [step_11_visualization.md](step_11_visualization.md) |
 | **12** | High-Speed Simulation Runner, Telemetry & Metrics Recorder | *PENDING* | - |
 | **13** | pybind11 C++ Simulator Bindings | *PENDING* | - |
 | **14** | Gymnasium Navigation Environment (AeroFleetNavEnv) | *PENDING* | - |
