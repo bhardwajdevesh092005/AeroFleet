@@ -133,7 +133,7 @@ void Simulator::reset(uint64_t seed) {
     m_lastCoordinatorDispatchTime = -10.0;
 }
 
-void Simulator::resetNavigationTask(uint64_t seed, const Vec3& start, const Vec3& target) {
+void Simulator::resetNavigationTask(uint64_t seed, const Vec3& start, const Vec3& target, double initialYaw) {
     reset(seed);
     if (!m_config.world.contains(start, m_config.fleet.uavRadius) ||
         !m_config.world.contains(target, m_config.fleet.uavRadius)) {
@@ -141,6 +141,9 @@ void Simulator::resetNavigationTask(uint64_t seed, const Vec3& start, const Vec3
     }
     if (start.distance(target) <= m_navigationArrivalRadius) {
         throw std::invalid_argument("navigation target must be farther than the arrival radius");
+    }
+    if (!std::isnan(initialYaw) && !std::isfinite(initialYaw)) {
+        throw std::invalid_argument("navigation initial yaw must be finite when specified");
     }
 
     // Stage 1 is an obstacle-free, single-UAV waypoint task. Later curriculum
@@ -152,7 +155,9 @@ void Simulator::resetNavigationTask(uint64_t seed, const Vec3& start, const Vec3
     m_fleet.initialize(taskFleet, m_config.energy, m_map, m_config.world.defaultSpawnAltitude);
 
     auto& uav = m_fleet.getUAV(0);
-    const double yaw = std::atan2(target.y - start.y, target.x - start.x);
+    const double yaw = std::isnan(initialYaw)
+        ? std::atan2(target.y - start.y, target.x - start.x)
+        : initialYaw;
     uav.reset(start, yaw);
     uav.targetWaypoint = target;
     uav.mode = UAVMode::FLYING_TO_DESTINATION;
@@ -278,6 +283,7 @@ StepResult Simulator::step(const std::vector<VelocityCommand>& actions) {
     const double dtPolicy = (m_config.simulation.dtPolicy > 0.0) ? m_config.simulation.dtPolicy : 0.1;
     const double dtPhysics = (m_config.simulation.dtPhysics > 0.0) ? m_config.simulation.dtPhysics : 0.02;
     const size_t numSubSteps = (dtPolicy > dtPhysics) ? static_cast<size_t>(std::round(dtPolicy / dtPhysics)) : 1;
+    const double actualStepDuration = static_cast<double>(numSubSteps) * dtPhysics;
 
     std::vector<UAVState> prevUavs = m_fleet.getAllUAVs();
     const size_t initialCollisionCount = m_collisionEvents.size();
@@ -316,7 +322,7 @@ StepResult Simulator::step(const std::vector<VelocityCommand>& actions) {
         const bool failed = crashed || uav.mode == UAVMode::EMERGENCY || uav.batteryPercent <= 0.0;
         const bool succeeded = m_navigationTask && m_navigationTaskSucceeded && !wasNavigationTaskSucceeded;
         result.rewards.push_back(m_navigationTask
-            ? computeNavigationReward(uav, prevUav, succeeded, failed, dtPolicy)
+            ? computeNavigationReward(uav, prevUav, succeeded, failed, actualStepDuration)
             : computeReward(uav, prevUav, reached, crashed));
         result.terminated.push_back(
             (m_navigationTask && m_navigationTaskSucceeded) || uav.mode == UAVMode::EMERGENCY || uav.batteryPercent <= 0.0

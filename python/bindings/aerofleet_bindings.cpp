@@ -4,6 +4,7 @@
 #include <sstream>
 #include <cstring>
 #include <cmath>
+#include <limits>
 
 #include "core/Simulator.hpp"
 #include "core/Types.hpp"
@@ -266,10 +267,11 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
             py::gil_scoped_release release;
             self.reset(seed);
         }, py::arg("seed") = 0)
-        .def("reset_navigation_task", [](Simulator& self, uint64_t seed, const Vec3& start, const Vec3& target) {
+        .def("reset_navigation_task", [](Simulator& self, uint64_t seed, const Vec3& start, const Vec3& target, double initialYaw) {
             py::gil_scoped_release release;
-            self.resetNavigationTask(seed, start, target);
-        }, py::arg("seed"), py::arg("start"), py::arg("target"))
+            self.resetNavigationTask(seed, start, target, initialYaw);
+        }, py::arg("seed"), py::arg("start"), py::arg("target"),
+           py::arg("initial_yaw") = std::numeric_limits<double>::quiet_NaN())
         .def("step", [](Simulator& self, const std::vector<VelocityCommand>& actions) {
             py::gil_scoped_release release;
             return self.step(actions);

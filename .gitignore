@@ -70,5 +70,7 @@ Testing/
 
 __pycache__/
 .vscode/
+.venv/
 logs/
+runs/
 third_party/

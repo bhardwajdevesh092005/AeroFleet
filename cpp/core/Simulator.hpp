@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <array>
+#include <limits>
 #include "core/Config.hpp"
 #include "core/Types.hpp"
 #include "core/WorldState.hpp"
@@ -67,7 +68,10 @@ public:
     explicit Simulator(const std::string& configPath = "config/simulation.json");
 
     void reset(uint64_t seed = 0);
-    void resetNavigationTask(uint64_t seed, const Vec3& start, const Vec3& target);
+    void resetNavigationTask(
+        uint64_t seed, const Vec3& start, const Vec3& target,
+        double initialYaw = std::numeric_limits<double>::quiet_NaN()
+    );
 
     /**
      * @brief Step simulation by 1 policy control interval (dtPolicy) using provided velocity commands.

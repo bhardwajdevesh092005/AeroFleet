@@ -18,8 +18,10 @@ application. Heuristic navigation and dispatch are baselines and useful
 fallbacks during development; both learned policies remain RL objectives.
 
 This intent is consistent across the complete design guide, the canonical
-20-step plan, and the implementation. The project now has a deterministic
-Stage 1 navigation task suitable for initial single-UAV experiments. It is
+20-step plan, and the implementation. The project has a deterministic Stage 1
+navigation task and a randomized route/heading distribution for single-UAV
+experiments. Initial PPO runs did not produce a successful policy, so this is
+training infrastructure rather than a demonstrated learned capability. It is
 not yet ready for the full navigation curriculum or coordinator training.
 
 ## End-to-end flow and current state
@@ -30,7 +32,7 @@ not yet ready for the full navigation curriculum or coordinator training.
 | Baselines and visualization | Exercise delivery flow and inspect authoritative snapshots | Heuristic baselines, renderer, and telemetry implemented |
 | Python boundary | Expose simulator state and actions through pybind11 | Built and tested for Python 3.14 in this review |
 | Navigation environment | Give a navigation policy a controlled, repeatable task | Stage 1 open-space waypoint scenario implemented; full-fleet mode remains available |
-| Navigation training | Train and evaluate shared UAV policy through a curriculum | Not implemented; no agent trained |
+| Navigation training | Train and evaluate shared UAV policy through a curriculum | Python PPO trainer/evaluator implemented and validated; initial checkpoints have 0% success; no usable policy yet |
 | Native navigation inference | Run the exported policy in C++ with a measured safety layer | Not implemented |
 | Coordinator environment/training | Learn fleet dispatch against a frozen navigator | Not implemented; confirmed RL objective |
 | System evaluation | Compare heuristic and learned combinations on paired seeds | Not implemented |
@@ -40,9 +42,11 @@ not yet ready for the full navigation curriculum or coordinator training.
 ### 1. Stage 1 waypoint task is implemented; later scenarios remain pending
 
 By default, `AeroFleetNavEnv.reset()` now creates a reproducible one-UAV,
-obstacle-free waypoint task with an active reachable target. The stochastic
-delivery simulator remains available with `scenario="full_fleet"`. The
-goal-reaching integration test verifies success termination.
+obstacle-free waypoint task with an active reachable target. Training and
+evaluation use seeded random routes and initial heading independent of the
+goal. The stochastic delivery simulator remains available with
+`scenario="full_fleet"`. The goal-reaching integration test verifies success
+termination.
 
 The next curriculum stages still need deterministic setup and task-level
 success criteria for:
@@ -52,10 +56,14 @@ success criteria for:
 3. multi-UAV traffic;
 4. full dynamic demand and fleet dispatch.
 
-Stage 1 is implemented. Random-action episode stability remains an API smoke
-test and does not demonstrate learned obstacle avoidance or delivery skills.
+Stage 1 is implemented, and Python PPO training/evaluation entry points now
+target it. Random-action episode stability remains an API smoke check and does
+not demonstrate learned obstacle avoidance or delivery skills. Training has
+run, but earlier schema-v2/aligned-heading experiments achieved zero waypoint
+success. The audited pipeline uses a corrected discount horizon, randomizes
+initial heading, and has not yet produced a usable policy.
 
-### 2. Observation schema v2 adds state and finite normalization
+### 2. Observation schema v3 adds state and finite normalization
 
 The 87-value schema includes body-frame velocity and acceleration, target
 displacement and distance, battery, payload, speed, lidar, three relative

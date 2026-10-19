@@ -22,7 +22,8 @@ except ImportError as exc:  # pragma: no cover - depends on optional native buil
     ) from exc
 
 
-OBSERVATION_SCHEMA_VERSION = 2
+OBSERVATION_SCHEMA_VERSION = 3
+NAVIGATION_TASK_VERSION = 2
 OBSERVATION_SIZE = 87
 OBSERVATION_FEATURE_ORDER = (
     "velocity_forward", "velocity_left", "velocity_up",
@@ -67,9 +68,13 @@ class AeroFleetNavEnv(gym.Env):
 
     Actions are ``[vx, vy, vz]`` in ``[-1, 1]``. The first two components
     scale by the configured maximum horizontal speed, and the last by maximum
-    vertical speed. C++ kinematics remain authoritative and enforce limits.
+    vertical speed. By default the command is in world coordinates; set
+    ``action_frame="body"`` to express it as ``[forward, left, up]``. C++
+    kinematics remain authoritative and enforce physical limits.
 
     The default reset creates a deterministic, obstacle-free waypoint task.
+    Randomized waypoint episodes also sample initial yaw independently of the
+    route, so the policy must steer using its relative-target observation.
     Pass ``options={"scenario": "full_fleet"}`` to run the stochastic delivery
     simulation. Observations use versioned, bounded body-frame features.
     Navigation episodes terminate on waypoint arrival, collision, or battery
@@ -82,6 +87,8 @@ class AeroFleetNavEnv(gym.Env):
         self,
         config_path: str | Path = "config/simulation.json",
         max_episode_steps: int = 2_000,
+        randomize_waypoint: bool = False,
+        action_frame: str = "world",
     ) -> None:
         super().__init__()
         if max_episode_steps <= 0:
@@ -89,6 +96,10 @@ class AeroFleetNavEnv(gym.Env):
 
         self.config_path = str(config_path)
         self.max_episode_steps = int(max_episode_steps)
+        self.randomize_waypoint = bool(randomize_waypoint)
+        if action_frame not in ("world", "body"):
+            raise ValueError("action_frame must be 'world' or 'body'")
+        self.action_frame = action_frame
         self.sim = Simulator(self.config_path)
         self._uav_id = 0
         self._episode_steps = 0
@@ -120,12 +131,10 @@ class AeroFleetNavEnv(gym.Env):
                 "velocity_xy_mps": self._max_horizontal_speed,
                 "velocity_z_mps": self._max_vertical_speed,
                 "acceleration_mps2": float(self.sim.max_acceleration),
-                "relative_position_m": tuple(
-                    float(v) for v in (
-                        self.sim.world_extent.x,
-                        self.sim.world_extent.y,
-                        self.sim.world_extent.z,
-                    )
+                "relative_position_m": (
+                    float(np.hypot(self.sim.world_extent.x, self.sim.world_extent.y)),
+                    float(np.hypot(self.sim.world_extent.x, self.sim.world_extent.y)),
+                    float(self.sim.world_extent.z),
                 ),
                 "target_distance_m": float(np.linalg.norm([
                     self.sim.world_extent.x,
@@ -163,7 +172,17 @@ class AeroFleetNavEnv(gym.Env):
         self._scenario = str(options.get("scenario", "open_waypoint"))
         if self._scenario == "open_waypoint":
             start, target = self._waypoint_positions(options)
-            self.sim.reset_navigation_task(cpp_seed, start, target)
+            initial_yaw = options.get("initial_yaw")
+            if initial_yaw is None and self.randomize_waypoint:
+                initial_yaw = float(self.np_random.uniform(-np.pi, np.pi))
+            if initial_yaw is not None and not np.isfinite(initial_yaw):
+                raise ValueError("initial_yaw must be finite")
+            self.sim.reset_navigation_task(
+                cpp_seed,
+                start,
+                target,
+                float(initial_yaw) if initial_yaw is not None else float("nan"),
+            )
         elif self._scenario == "full_fleet":
             self.sim.reset(cpp_seed)
         else:
@@ -171,11 +190,14 @@ class AeroFleetNavEnv(gym.Env):
                 f"unsupported scenario {self._scenario!r}; choose 'open_waypoint' or 'full_fleet'"
             )
         self._episode_steps = 0
+        initial_raw = self.sim.get_observation_numpy(self._uav_id)
         return self._observation(), {
             "seed": actual_seed,
             "uav_id": self._uav_id,
             "scenario": self._scenario,
             "observation_schema_version": OBSERVATION_SCHEMA_VERSION,
+            "navigation_task_version": NAVIGATION_TASK_VERSION,
+            "initial_yaw": float(np.arctan2(initial_raw[75], initial_raw[76])),
         }
 
     def step(
@@ -184,6 +206,19 @@ class AeroFleetNavEnv(gym.Env):
         desired_velocity = _normalized_velocity(
             action, self._max_horizontal_speed, self._max_vertical_speed
         )
+        if self.action_frame == "body":
+            raw_observation = self.sim.get_observation_numpy(self._uav_id)
+            heading_sin = float(raw_observation[75])
+            heading_cos = float(raw_observation[76])
+            forward, left, up = desired_velocity
+            desired_velocity = np.asarray(
+                [
+                    heading_cos * forward - heading_sin * left,
+                    heading_sin * forward + heading_cos * left,
+                    up,
+                ],
+                dtype=np.float64,
+            )
         command = VelocityCommand(
             float(desired_velocity[0]),
             float(desired_velocity[1]),
@@ -198,7 +233,10 @@ class AeroFleetNavEnv(gym.Env):
         info = {
             "uav_id": self._uav_id,
             "scenario": self._scenario,
+            "action_frame": self.action_frame,
             "success": bool(self.sim.navigation_task_succeeded),
+            # Stable name used by SB3's EvalCallback and Monitor wrappers.
+            "is_success": bool(self.sim.navigation_task_succeeded),
             "observation_schema_version": OBSERVATION_SCHEMA_VERSION,
             "simulated_time": float(self.sim.simulated_time),
             "episode_steps": self._episode_steps,
@@ -234,12 +272,43 @@ class AeroFleetNavEnv(gym.Env):
             raise RuntimeError("C++ simulator returned a non-finite observation")
         observation = self._normalize_observation(raw)
         if not self.observation_space.contains(observation):
-            raise RuntimeError("normalized observation falls outside the declared Box")
+            outside = np.flatnonzero(
+                (observation < self.observation_space.low)
+                | (observation > self.observation_space.high)
+            )
+            details = [(int(i), float(observation[i])) for i in outside[:8]]
+            raise RuntimeError(
+                "normalized observation falls outside the declared Box at "
+                f"feature indices/values {details}"
+            )
         return observation
 
     def _waypoint_positions(self, options: dict[str, Any]) -> tuple[Vec3, Vec3]:
         extent = self.sim.world_extent
         lower = self.sim.world_min
+        if self.randomize_waypoint and "start" not in options and "target" not in options:
+            # Keep starts and goals inside a broad interior region. A fixed
+            # altitude makes this an XY navigation curriculum stage while the
+            # episode-specific route is reproducible from Gymnasium's seed.
+            margin = np.asarray([0.15, 0.15])
+            span = np.asarray([0.70, 0.70])
+            min_xy = np.asarray([lower.x, lower.y]) + margin * np.asarray(
+                [extent.x, extent.y]
+            )
+            max_xy = min_xy + span * np.asarray([extent.x, extent.y])
+            altitude = float(self.sim.default_spawn_altitude)
+            for _ in range(32):
+                start_xy = self.np_random.uniform(min_xy, max_xy)
+                target_xy = self.np_random.uniform(min_xy, max_xy)
+                if np.linalg.norm(target_xy - start_xy) >= 0.25 * min(extent.x, extent.y):
+                    break
+            else:  # pragma: no cover - only possible for unusually tiny maps
+                start_xy, target_xy = min_xy, max_xy
+            return (
+                Vec3(float(start_xy[0]), float(start_xy[1]), altitude),
+                Vec3(float(target_xy[0]), float(target_xy[1]), altitude),
+            )
+
         start_default = [
             lower.x + 0.25 * extent.x,
             lower.y + 0.50 * extent.y,
@@ -260,6 +329,10 @@ class AeroFleetNavEnv(gym.Env):
 
     def _normalize_observation(self, raw: np.ndarray) -> np.ndarray:
         extent = self.sim.world_extent
+        # The first two components are in the UAV body frame. A body-frame
+        # horizontal component can combine both world-axis displacements, so
+        # scaling each by only its corresponding map extent can exceed 1.
+        horizontal_position_scale = float(np.hypot(extent.x, extent.y))
         max_horizontal = self._max_horizontal_speed
         max_vertical = self._max_vertical_speed
         max_relative_speed = np.array(
@@ -269,12 +342,12 @@ class AeroFleetNavEnv(gym.Env):
         scales = np.ones(OBSERVATION_SIZE, dtype=np.float64)
         scales[0:3] = [max_horizontal, max_horizontal, max_vertical]
         scales[3:6] = self.sim.max_acceleration
-        scales[6:9] = [extent.x, extent.y, extent.z]
+        scales[6:9] = [horizontal_position_scale, horizontal_position_scale, extent.z]
         scales[9] = float(np.linalg.norm([extent.x, extent.y, extent.z]))
         scales[11] = max(self.sim.max_payload_mass, 1e-6)
         scales[12] = self.sim.max_observation_speed
         scales[57:75] = np.tile(
-            [extent.x, extent.y, extent.z, *max_relative_speed], 3
+            [horizontal_position_scale, horizontal_position_scale, extent.z, *max_relative_speed], 3
         )
         observation = raw.astype(np.float64) / scales
         observation[10] = raw[10]  # battery fraction

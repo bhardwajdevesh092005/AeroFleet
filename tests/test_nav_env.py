@@ -4,6 +4,8 @@ Run with: PYTHONPATH=python python -m pytest tests/test_nav_env.py
 Requires requirements-rl.txt and an importable aerofleet_cpp extension.
 """
 
+import json
+
 import numpy as np
 import pytest
 
@@ -49,7 +51,7 @@ def test_reset_seed_reproduces_observation_including_seed_zero():
         np.testing.assert_array_equal(first, second)
         assert info_first["seed"] == info_second["seed"] == 0
         assert info_first["scenario"] == "open_waypoint"
-        assert info_first["observation_schema_version"] == 2
+        assert info_first["observation_schema_version"] == OBSERVATION_SCHEMA_VERSION
         assert len(OBSERVATION_FEATURE_ORDER) == 87
         assert env.observation_schema["version"] == OBSERVATION_SCHEMA_VERSION
         assert env.sim.fleet_size == 1
@@ -98,19 +100,28 @@ def test_default_waypoint_task_is_reachable_and_terminates_successfully():
         assert np.all(observation >= env.observation_space.low)
         assert np.all(observation <= env.observation_space.high)
 
+        previous_distance = initial_distance
         for _ in range(env.max_episode_steps):
             observation, reward, terminated, truncated, info = env.step(
                 np.array([1.0, 0.0, 0.0], dtype=np.float32)
             )
+            current_distance = float(env.sim.get_observation(0).distance_to_target)
             assert env.observation_space.contains(observation)
             if terminated or truncated:
                 break
+            previous_distance = current_distance
 
         assert terminated
         assert not truncated
         assert reward > 9.0
         assert info["success"]
         assert env.sim.get_observation(0).distance_to_target <= 2.0
+        dt_policy = 0.1
+        max_progress = (env.sim.max_horizontal_speed + env.sim.max_vertical_speed) * dt_policy
+        expected_reward = -0.01 + 0.1 * np.clip(
+            previous_distance - current_distance, -max_progress, max_progress
+        ) + 10.0
+        assert reward == pytest.approx(expected_reward, abs=1e-5)
     finally:
         env.close()
 
@@ -122,6 +133,94 @@ def test_waypoint_reset_options_are_validated():
             env.reset(seed=1, options={"start": [0.0, 0.0], "target": [10.0, 0.0, 15.0]})
         with pytest.raises(ValueError, match="unsupported scenario"):
             env.reset(seed=1, options={"scenario": "unknown"})
+    finally:
+        env.close()
+
+
+def test_randomized_routes_are_seeded_and_vary_across_seeds():
+    env = AeroFleetNavEnv(randomize_waypoint=True, action_frame="body")
+    try:
+        first, _ = env.reset(seed=501)
+        first_raw = env.sim.get_observation_numpy(0)
+        repeat, _ = env.reset(seed=501)
+        repeat_raw = env.sim.get_observation_numpy(0)
+        different, _ = env.reset(seed=502)
+        different_raw = env.sim.get_observation_numpy(0)
+
+        np.testing.assert_array_equal(first, repeat)
+        np.testing.assert_array_equal(first_raw, repeat_raw)
+        assert not np.array_equal(first_raw[6:10], different_raw[6:10])
+        assert not np.array_equal(first_raw[75:77], different_raw[75:77])
+        assert env.observation_space.contains(different)
+    finally:
+        env.close()
+
+
+def test_body_action_matches_direct_cpp_transition():
+    from aerofleet_cpp import Simulator, Vec3, VelocityCommand
+
+    config = "config/simulation.json"
+    start = [-120.0, -80.0, 15.0]
+    target = [140.0, 210.0, 15.0]
+    initial_yaw = -1.1
+    action = np.asarray([0.35, -0.2, 0.1], dtype=np.float32)
+    env = AeroFleetNavEnv(config_path=config, action_frame="body")
+    direct = Simulator(config)
+    try:
+        env.reset(seed=71, options={
+            "start": start, "target": target, "initial_yaw": initial_yaw,
+        })
+        direct.reset_navigation_task(71, Vec3(*start), Vec3(*target), initial_yaw)
+        heading_sin, heading_cos = env.sim.get_observation_numpy(0)[75:77]
+        forward, left, up = _normalized_velocity(
+            action, env.sim.max_horizontal_speed, env.sim.max_vertical_speed
+        )
+        command = VelocityCommand(
+            float(heading_cos * forward - heading_sin * left),
+            float(heading_sin * forward + heading_cos * left),
+            float(up),
+        )
+        direct_result = direct.step([command])
+        _, reward, terminated, truncated, _ = env.step(action)
+
+        assert reward == pytest.approx(direct_result.rewards[0], abs=1e-6)
+        assert terminated is bool(direct_result.terminated[0])
+        assert truncated is False
+        np.testing.assert_allclose(
+            env.sim.get_observation_numpy(0), direct_result.observations[0].to_numpy(), atol=1e-6
+        )
+    finally:
+        env.close()
+
+
+def test_progress_reward_bound_uses_actual_rounded_physics_duration(tmp_path):
+    with open("config/simulation.json", encoding="utf-8") as config_file:
+        config = json.load(config_file)
+    config["simulation"]["dt_physics"] = 0.02
+    config["simulation"]["dt_policy"] = 0.03  # C++ rounds 1.5 substeps to 2 (= 0.04s).
+    config_path = tmp_path / "rounded_timestep.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    env = AeroFleetNavEnv(config_path=config_path, action_frame="world")
+    try:
+        env.reset(seed=813, options={"start": [0.0, 0.0, 15.0], "target": [300.0, 0.0, 90.0]})
+        action = np.asarray([1.0, 0.0, 1.0], dtype=np.float32)
+        for _ in range(300):
+            observation, _, terminated, truncated, _ = env.step(action)
+            assert not terminated and not truncated
+
+        previous_distance = float(env.sim.get_observation(0).distance_to_target)
+        observation, reward, terminated, truncated, _ = env.step(action)
+        current_distance = float(env.sim.get_observation(0).distance_to_target)
+        effective_dt = 0.04
+        max_progress = (env.sim.max_horizontal_speed + env.sim.max_vertical_speed) * effective_dt
+        expected = -0.01 + 0.1 * np.clip(
+            previous_distance - current_distance, -max_progress, max_progress
+        )
+
+        assert env.sim.simulated_time == pytest.approx(12.04)
+        assert reward == pytest.approx(expected, abs=1e-5)
+        assert not terminated and not truncated
+        assert env.observation_space.contains(observation)
     finally:
         env.close()
 
