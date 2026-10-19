@@ -115,5 +115,5 @@ Summary: 8 Passed, 0 Failed
 | Re-queuing Ghost Assignments | Aborted flight leaves previous UAV assigned in pending pool | `assignedUavId` automatically reset to $-1$ whenever transitioning to `PENDING`. |
 
 ---
-**Status**: Step 07 is completed with 100% test pass rate. Ready for **Step 08: Fleet State Machine & UAV Operational Lifecycle**.
+**At the time of completion:** Step 07 passed its recorded tests and the next planned item was **Step 08: Fleet State Machine & UAV Operational Lifecycle**. Current overall status is maintained in [the progress ledger](README.md).
 

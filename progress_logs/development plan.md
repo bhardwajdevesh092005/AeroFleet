@@ -1,5 +1,7 @@
 # AeroFleet: 20-Step Phase-Wise Development and Testing Plan
 
+> **Progress snapshot (2026-10-19):** Steps 01–10 are implemented; Steps 11–20 are pending. The current clean Release build and all 11 CTest suites pass. See [README.md](README.md) for the ledger and [testing_and_integration_coverage.md](testing_and_integration_coverage.md) for current test evidence and integration boundaries. The milestones below remain targets; later visualization, telemetry, Python/RL, and ONNX work has not been completed.
+
 ## 1. Executive Summary & Architectural Overview
 
 **AeroFleet** is an end-to-end reinforcement-learning-driven simulation of an autonomous urban Unmanned Aerial Vehicle (UAV) delivery fleet. Delivery requests arrive dynamically from stores and customers across an urban terrain. A **Central Fleet Coordinator** allocates feasible deliveries to candidate UAVs, while an **Autonomous UAV Navigation Policy** guides individual drones through 3D urban air corridors, avoiding static buildings and dynamic UAV traffic while managing finite battery reserves.

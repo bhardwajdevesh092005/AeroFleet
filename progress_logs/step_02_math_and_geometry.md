@@ -124,5 +124,5 @@ Test project /mnt/c/Users/deves/Desktop/AeroFleet/build
 | Degenerate Capsule Segment | $A = B$ (zero length displacement) | Guarded $AB$ length squared $< \epsilon$: defaults closest point to $A$, reducing capsule to a Sphere test. |
 
 ---
-**Conclusion**: Step 02 is complete and verified. Moving to **Step 03: Procedural City Map Generator & World Representation** to finish Phase I!
+**At the time of completion:** Step 02 was verified and the next planned item was **Step 03: Procedural City Map Generator & World Representation**. Current overall status is maintained in [the progress ledger](README.md).
 

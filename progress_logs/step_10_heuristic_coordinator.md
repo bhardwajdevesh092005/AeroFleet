@@ -26,9 +26,11 @@ git diff --check
 ```
 
 - Build completed successfully.
-- CTest: **10/10 suites passed**.
+- At Step 10 completion: CTest **10/10 suites passed**.
 - Coordinator cases cover no double booking, low-battery exclusion, missing charger rejection, 200-request/5-UAV overload queuing, stale/expired/oversized request filtering, deadline urgency, and waiting-age priority.
 - `git diff --check`: clean.
+
+After adding the cross-module integration suite, the latest consolidated verification is **11/11 CTest suites passed**, all 11 test executables passed directly, and `AeroFleet --headless` loaded the default configuration. See [testing_and_integration_coverage.md](testing_and_integration_coverage.md).
 
 ## Limitations
 

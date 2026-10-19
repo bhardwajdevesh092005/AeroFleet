@@ -111,5 +111,5 @@ Summary: 6 Passed, 0 Failed
 | Charger Slot Contention | Multiple drones return to full charging station | `findNearestAvailableCharger()` prioritizes stations with `hasAvailableSlot() == true`. |
 
 ---
-**Status**: Step 08 is completed with 100% test pass rate. Ready for **Step 09: Baseline Heuristic Navigation & Deterministic Waypoint Controller**.
+**At the time of completion:** Step 08 passed its recorded tests and the next planned item was **Step 09: Baseline Heuristic Navigation & Deterministic Waypoint Controller**. Current overall status is maintained in [the progress ledger](README.md).
 

@@ -37,6 +37,8 @@ Results:
 - Navigation suite: **4/4 cases passed** (open-space waypoint arrival, building avoidance with swept collision checks, arrival/invalid timestep handling, deterministic actions).
 - `git diff --check`: clean.
 
+The above records the Step 09 completion run. The latest consolidated verification, after Steps 10 and the cross-module integration suite were added, is **11/11 CTest suites passed**; see [testing_and_integration_coverage.md](testing_and_integration_coverage.md).
+
 ## Notes
 
 The controller is a benchmark baseline, not a global path planner. Artificial potential fields can still encounter local minima in dense or narrow layouts; the tangential/vertical escape components mitigate but do not guarantee a route in every map. The planned 100-map arrival/path/energy benchmark is not yet implemented and remains a useful follow-up validation before RL training.

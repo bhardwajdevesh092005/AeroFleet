@@ -2,6 +2,8 @@
 
 This directory serves as the persistent audit trail and progress ledger for the 20-step implementation of the **AeroFleet** autonomous UAV delivery fleet simulation.
 
+> **Current implementation snapshot (2026-10-19):** Steps 01–10 are implemented. Steps 11–20 remain pending. A clean Release build, all 11 registered CTest suites, all 11 test executables (67 named test cases), the `AeroFleet --headless` startup check, and `git diff --check` passed. See [testing_and_integration_coverage.md](testing_and_integration_coverage.md) for the latest verification record. Historical outputs in individual step logs describe the results at the time each step was completed.
+
 ## Structure & Conventions
 Each major development step is broken down into granular sub-parts and documented with:
 1. **Sub-part Objectives & Scope**
@@ -36,4 +38,8 @@ Each major development step is broken down into granular sub-parts and documente
 | **18** | Embedded C++ ONNX Runtime Engine & Navigation Safety Layer | *PENDING* | - |
 | **19** | Central Fleet Coordinator RL Training & Action Masking | *PENDING* | - |
 | **20** | Full Application Integration, Benchmarking & Stress Testing | *PENDING* | - |
+
+### Current boundary
+
+The current code integrates generated requests, heuristic dispatch, waypoint navigation, kinematics, collision checks, battery discharge, and the fleet delivery lifecycle in integration tests. A continuously running top-level simulator, real-time visualization, telemetry/metrics, Python bindings and RL/ONNX pipelines are not implemented yet.
 

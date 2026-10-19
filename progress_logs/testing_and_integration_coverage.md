@@ -15,6 +15,9 @@ The repository also has focused suites for configuration, math/geometry, world g
 - CTest: **11/11 suites passed**.
 - `git diff --check`: clean.
 - The CTest suites contain 67 individual named cases in total.
+- Each of the 11 test executables was also run directly; all reported zero failed cases.
+- `./build/AeroFleet --headless` loaded `config/simulation.json` successfully.
+- Latest clean verification command sequence: `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release`, `cmake --build build --clean-first --parallel`, `ctest --test-dir build --output-on-failure`, direct execution of all test binaries, headless startup, and `git diff --check`.
 
 ## Coverage Boundary
 

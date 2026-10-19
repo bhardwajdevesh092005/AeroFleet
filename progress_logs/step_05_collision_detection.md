@@ -118,5 +118,5 @@ Summary: 5 Passed, 0 Failed
 | False Positive Near-Miss | Drones flying vertically separated or parallel to obstacles register false alarm | Exact segment-to-segment Euclidean distance squared compared strictly against $(r_A + r_B)^2$. |
 
 ---
-**Status**: Step 05 is completed with 100% test pass rate. Ready for **Step 06: High-Fidelity Battery, Energy & Charging Station Mechanics**.
+**At the time of completion:** Step 05 passed its recorded tests and the next planned item was **Step 06: High-Fidelity Battery, Energy & Charging Station Mechanics**. Current overall status is maintained in [the progress ledger](README.md).
 

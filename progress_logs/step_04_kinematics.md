@@ -114,4 +114,4 @@ Summary: 7 Passed, 0 Failed
 ```
 
 ---
-**Status**: Step 04 is completed with 100% test pass rate. Ready for **Step 05: Continuous Collision Detection (CCD) & Conflict Resolution**.
+**At the time of completion:** Step 04 passed its recorded tests and the next planned item was **Step 05: Continuous Collision Detection (CCD) & Conflict Resolution**. Current overall status is maintained in [the progress ledger](README.md).
