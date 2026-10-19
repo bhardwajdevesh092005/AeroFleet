@@ -106,7 +106,8 @@ bool FleetManager::abortAssignment(UAVId uavId, DeliveryRequest& outRequeuedRequ
 
     // If payload has not been picked up, re-queue request
     if (ctx.activeRequest.status == RequestStatus::ASSIGNED ||
-        ctx.activeRequest.status == RequestStatus::PICKING_UP) {
+        ctx.activeRequest.status == RequestStatus::PICKING_UP ||
+        ctx.activeRequest.status == RequestStatus::IN_TRANSIT) {
         ctx.activeRequest.transitionTo(RequestStatus::PENDING);
         outRequeuedRequest = ctx.activeRequest;
     }

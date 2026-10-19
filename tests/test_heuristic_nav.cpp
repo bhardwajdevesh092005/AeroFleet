@@ -149,6 +149,20 @@ void test_deterministic_obstacle_action() {
     const auto second = controller.computeAction(uav, map, 0.1).desiredVelocity;
     expect(first.isApprox(second, 1e-12), "same state must produce identical action");
 }
+
+void test_multi_uav_head_on_separation_commands_oppositeSides() {
+    CityMap map = emptyMap();
+    WaypointController controller;
+    UAVState left(1, Vec3(-4.0, 0.0, 15.0));
+    UAVState right(2, Vec3(4.0, 0.0, 15.0));
+    left.targetWaypoint = Vec3(20.0, 0.0, 15.0);
+    right.targetWaypoint = Vec3(-20.0, 0.0, 15.0);
+    const std::vector<UAVState> traffic{left, right};
+    const auto leftAction = controller.computeActionWithTraffic(left, map, traffic, 0.1).desiredVelocity;
+    const auto rightAction = controller.computeActionWithTraffic(right, map, traffic, 0.1).desiredVelocity;
+    expect(leftAction.y * rightAction.y < 0.0,
+           "head-on UAVs should receive deterministic separation commands on opposite sides");
+}
 } // namespace
 
 int main() {
@@ -159,6 +173,7 @@ int main() {
     run("test_static_obstacle_avoidance", test_static_obstacle_avoidance);
     run("test_arrival_and_invalid_timestep", test_arrival_and_invalid_timestep);
     run("test_deterministic_obstacle_action", test_deterministic_obstacle_action);
+    run("test_multi_uav_head_on_separation_commands_oppositeSides", test_multi_uav_head_on_separation_commands_oppositeSides);
     std::cout << "========================================\nSummary: " << passed
               << " Passed, " << failed << " Failed\n========================================\n";
     return failed == 0 ? 0 : 1;

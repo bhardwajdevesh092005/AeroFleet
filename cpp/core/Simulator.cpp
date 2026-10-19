@@ -65,7 +65,9 @@ Simulator::Simulator(const SimulationConfig& config)
     : m_config(config),
       m_map(WorldGenerator::generate(m_config.world, m_config.simulation.randomSeed)),
       m_fleet(m_config.fleet, m_config.energy, m_map, m_config.world.defaultSpawnAltitude),
-      m_requestGen(m_config.requests, m_map, m_config.fleet.maxHorizontalSpeed, m_config.simulation.randomSeed),
+      m_requestGen(m_config.requests, m_map, m_config.fleet.maxHorizontalSpeed,
+                   m_config.simulation.randomSeed,
+                   m_config.world.zMin + m_config.world.defaultSpawnAltitude),
       m_navigator(WaypointControllerConfig{
           1.0, 30.0, 20.0, 1.0, 1.0,
           m_config.fleet.maxHorizontalSpeed,
@@ -131,9 +133,31 @@ void Simulator::integratePhysicsSubStep(double dt, const std::vector<VelocityCom
         m_pendingRequests.insert(m_pendingRequests.end(), newRequests.begin(), newRequests.end());
     }
 
+    for (auto it = m_pendingRequests.begin(); it != m_pendingRequests.end();) {
+        const bool timedOut = currentTime > it->creationTime + m_config.requests.requestTimeoutSeconds;
+        if (it->status == RequestStatus::PENDING && (it->isExpired(currentTime) || timedOut)) {
+            it->transitionTo(RequestStatus::EXPIRED, currentTime);
+            m_metrics.recordRequestExpired(*it, currentTime);
+            m_logger.log(currentTime, SimulationEventType::REQUEST_EXPIRED, it->id);
+            it = m_pendingRequests.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
     // 3. Dispatch heuristic coordinator
     if (currentTime - m_lastCoordinatorDispatchTime >= m_config.simulation.dtCoordinator) {
         m_coordinator.dispatch(m_fleet, m_pendingRequests, m_map, currentTime);
+        for (const auto& request : m_pendingRequests) {
+            if (request.status == RequestStatus::ASSIGNED) {
+                m_logger.log(currentTime, SimulationEventType::REQUEST_ASSIGNED,
+                             request.id, request.assignedUavId);
+            }
+        }
+        m_pendingRequests.erase(
+            std::remove_if(m_pendingRequests.begin(), m_pendingRequests.end(),
+                           [](const DeliveryRequest& request) { return request.status != RequestStatus::PENDING; }),
+            m_pendingRequests.end());
         m_lastCoordinatorDispatchTime = currentTime;
     }
 
@@ -150,6 +174,7 @@ void Simulator::integratePhysicsSubStep(double dt, const std::vector<VelocityCom
 
     // 5. Apply actions, integrate kinematics, and discharge battery
     double totalPowerWatts = 0.0;
+    const std::vector<UAVState> trafficSnapshot = m_fleet.getAllUAVs();
     for (size_t i = 0; i < m_fleet.size(); ++i) {
         auto& uav = m_fleet.getUAV(i);
         VelocityCommand cmd;
@@ -158,7 +183,7 @@ void Simulator::integratePhysicsSubStep(double dt, const std::vector<VelocityCom
         } else if (uav.mode == UAVMode::FLYING_TO_PICKUP ||
                    uav.mode == UAVMode::FLYING_TO_DESTINATION ||
                    uav.mode == UAVMode::RETURNING_TO_CHARGE) {
-            cmd = m_navigator.computeAction(uav, m_map, dt);
+            cmd = m_navigator.computeActionWithTraffic(uav, m_map, trafficSnapshot, dt);
         }
         m_integrator.stepVelocityCommand(uav, cmd, dt);
         m_fleet.getBatteryModel().stepDischarge(uav, dt);
@@ -171,6 +196,22 @@ void Simulator::integratePhysicsSubStep(double dt, const std::vector<VelocityCom
     if (!newCollisions.empty()) {
         for (const auto& c : newCollisions) {
             m_metrics.recordCollision(c);
+            const auto abortCrashedAssignment = [&](UAVId id) {
+                DeliveryRequest requeued;
+                if (m_fleet.abortAssignment(id, requeued)) {
+                    m_requeuedRequests.push_back(requeued);
+                    m_logger.log(currentTime, SimulationEventType::REQUEST_REQUEUED, requeued.id, id);
+                }
+                if (id >= 0 && static_cast<size_t>(id) < m_fleet.size()) {
+                    m_fleet.getUAV(static_cast<size_t>(id)).mode = UAVMode::EMERGENCY;
+                }
+            };
+            abortCrashedAssignment(c.uavIdA);
+            if (c.type == CollisionType::UAV_UAV) abortCrashedAssignment(c.uavIdB);
+        }
+        if (!m_requeuedRequests.empty()) {
+            m_pendingRequests.insert(m_pendingRequests.end(), m_requeuedRequests.begin(), m_requeuedRequests.end());
+            m_requeuedRequests.clear();
         }
         m_collisionEvents.insert(m_collisionEvents.end(), newCollisions.begin(), newCollisions.end());
     }

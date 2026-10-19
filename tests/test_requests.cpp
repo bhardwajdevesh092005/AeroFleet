@@ -186,6 +186,23 @@ void test_generator_step_emissions() {
         "Poisson step emissions over 10 seconds must produce realistic request volume");
 }
 
+void test_delivery_waypoints_use_airborne_altitude() {
+    RequestSettings rs;
+    rs.minPayloadKg = 1.0;
+    rs.maxPayloadKg = 1.0;
+    CityMap map;
+    map.worldMin = Vec3(-100.0, -100.0, 0.0);
+    map.stores.push_back(StoreLocation{1, "Ground Store", Vec3(5.0, 6.0, 0.0)});
+    map.customers.push_back(CustomerLocation{2, "Ground Customer", Vec3(25.0, 30.0, 0.0)});
+    RequestGenerator gen(rs, map, 10.0, 42, 18.0);
+
+    const DeliveryRequest req = gen.generateSingle(0.0);
+    TEST_ASSERT(req.pickupLocation.z == 18.0 && req.dropoffLocation.z == 18.0,
+                "delivery waypoints from ground landmarks must be elevated to the configured flight altitude");
+    TEST_ASSERT(req.pickupLocation.x == 5.0 && req.dropoffLocation.x == 25.0,
+                "raising waypoint altitude must preserve landmark horizontal coordinates");
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "      AeroFleet Request Tests           \n";
@@ -199,6 +216,7 @@ int main() {
     RUN_TEST(test_deadline_and_expiration);
     RUN_TEST(test_payload_mass_bounds);
     RUN_TEST(test_generator_step_emissions);
+    RUN_TEST(test_delivery_waypoints_use_airborne_altitude);
 
     std::cout << "========================================\n";
     std::cout << "Summary: " << g_testsPassed << " Passed, " << g_testsFailed << " Failed\n";

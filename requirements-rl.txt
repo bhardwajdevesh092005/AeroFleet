@@ -1,0 +1,5 @@
+# Python learning-environment dependencies. Build/import aerofleet_cpp separately
+# with the repository's CMake configuration and pybind11 development headers.
+gymnasium>=1.0,<2.0
+numpy>=1.24
+pytest>=7

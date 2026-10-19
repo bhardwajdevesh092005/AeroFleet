@@ -35,3 +35,10 @@ try:
 except ImportError:
     pass
 
+try:
+    from .nav_env import AeroFleetNavEnv
+    __all__.append("AeroFleetNavEnv")
+except (ImportError, NameError):
+    # Keep importing the package's metadata possible without optional RL deps.
+    pass
+

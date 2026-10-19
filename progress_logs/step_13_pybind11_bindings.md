@@ -115,6 +115,10 @@ Total Test time (real) = 1.55 sec
 
 ## 5. Encountered Edge Cases & Resolutions
 
+### Current checkout validation note (2026-10-19)
+
+The binding source and Python tests are present, but the current checkout does not contain the workspace-local `third_party` headers and no system pybind11 package is available. CMake now discovers supported Python/pybind11 installations rather than pinning Python 3.14's extension suffix, and clearly skips the optional target when dependencies are absent. The Python module itself could not be rebuilt or re-tested in this environment; the earlier results above are historical results from the environment where the dependencies were installed.
+
 1. **User-Space Dependencies Without Sudo**:
    - *Problem*: System lacked root privileges and interactive terminal access (`sudo` prohibited).
    - *Resolution*: Downloaded standard distribution packages (`python3.14-dev`, `pybind11-dev`, `python3-numpy`, `libblas3`, `liblapack3`, `libgfortran5`) via non-root `apt-get download` and unpacked via `dpkg -x` directly into `<workspace>/third_party/`.

@@ -216,43 +216,67 @@ target_link_libraries(test_simulator PRIVATE AeroFleetCore)
 add_test(NAME SimulatorTests COMMAND test_simulator)
 set_tests_properties(SimulatorTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# Python pybind11 bindings module
-set(PYBIND11_INC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/include")
-set(PYTHON_INC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/include/python3.14")
+# Optional Python pybind11 module. Prefer installed CMake packages; retain a
+# workspace-local header fallback without pinning a Python minor version/ABI.
+find_package(Python3 COMPONENTS Interpreter Development.Module QUIET)
+find_package(pybind11 CONFIG QUIET)
 
-if(EXISTS "${PYBIND11_INC_DIR}/pybind11/pybind11.h" AND EXISTS "${PYTHON_INC_DIR}/Python.h")
-    add_library(aerofleet_cpp MODULE
+set(AEROFLEET_PYTHON_BINDINGS_AVAILABLE FALSE)
+if(Python3_FOUND AND pybind11_FOUND)
+    pybind11_add_module(aerofleet_cpp MODULE
         python/bindings/aerofleet_bindings.cpp
     )
-    target_include_directories(aerofleet_cpp SYSTEM PRIVATE
-        ${PYBIND11_INC_DIR}
-        ${PYTHON_INC_DIR}
-    )
-    target_include_directories(aerofleet_cpp PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/cpp
-    )
-    target_link_libraries(aerofleet_cpp PRIVATE
-        AeroFleetCore
-    )
+    target_link_libraries(aerofleet_cpp PRIVATE AeroFleetCore)
     set_target_properties(aerofleet_cpp PROPERTIES
-        PREFIX ""
-        SUFFIX ".cpython-314-x86_64-linux-gnu.so"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python"
     )
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        target_compile_options(aerofleet_cpp PRIVATE -fvisibility=hidden -fPIC)
+    set(AEROFLEET_PYTHON_BINDINGS_AVAILABLE TRUE)
+else()
+    set(PYBIND11_INC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/include")
+    if(Python3_FOUND AND EXISTS "${PYBIND11_INC_DIR}/pybind11/pybind11.h" AND Python3_Development.Module_FOUND)
+        add_library(aerofleet_cpp MODULE python/bindings/aerofleet_bindings.cpp)
+        target_include_directories(aerofleet_cpp SYSTEM PRIVATE "${PYBIND11_INC_DIR}" ${Python3_INCLUDE_DIRS})
+        target_link_libraries(aerofleet_cpp PRIVATE AeroFleetCore Python3::Module)
+        set_target_properties(aerofleet_cpp PROPERTIES
+            PREFIX ""
+            SUFFIX ".${Python3_SOABI}${CMAKE_SHARED_MODULE_SUFFIX}"
+            LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python"
+        )
+        set(AEROFLEET_PYTHON_BINDINGS_AVAILABLE TRUE)
     endif()
+endif()
 
-    find_program(PYTHON_EXECUTABLE python3)
-    if(PYTHON_EXECUTABLE)
-        add_test(NAME PythonBindingTests
-            COMMAND ${PYTHON_EXECUTABLE} tests/test_bindings.py
-        )
-        set_tests_properties(PythonBindingTests PROPERTIES
-            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-            ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python:${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/python3/dist-packages;LD_LIBRARY_PATH=${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/x86_64-linux-gnu:${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/x86_64-linux-gnu/blas:${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/x86_64-linux-gnu/lapack"
-        )
+if(AEROFLEET_PYTHON_BINDINGS_AVAILABLE)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(aerofleet_cpp PRIVATE -fvisibility=hidden)
     endif()
+    add_test(NAME PythonBindingTests
+        COMMAND ${Python3_EXECUTABLE} tests/test_bindings.py
+    )
+    set_tests_properties(PythonBindingTests PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
+    )
+
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} -c "import gymnasium, numpy, pytest"
+        RESULT_VARIABLE AEROFLEET_RL_PYTHON_DEPS_RESULT
+        OUTPUT_QUIET
+        ERROR_QUIET
+    )
+    if(AEROFLEET_RL_PYTHON_DEPS_RESULT EQUAL 0)
+        add_test(NAME GymnasiumNavigationTests
+            COMMAND ${Python3_EXECUTABLE} -m pytest -q tests/test_nav_env.py
+        )
+        set_tests_properties(GymnasiumNavigationTests PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
+        )
+    else()
+        message(STATUS "Gymnasium/NumPy/pytest not found; skipping Gymnasium navigation integration tests.")
+    endif()
+else()
+    message(STATUS "pybind11/Python development files not found; skipping aerofleet_cpp and Python binding tests.")
 endif()
 
 

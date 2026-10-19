@@ -59,6 +59,8 @@ def test_simulator_lifecycle():
 
     sim.reset(42)
     assert sim.fleet_size == 10
+    assert sim.max_horizontal_speed == 15.0
+    assert sim.max_vertical_speed == 5.0
     assert sim.step_count == 0
 
     snap = sim.get_snapshot()

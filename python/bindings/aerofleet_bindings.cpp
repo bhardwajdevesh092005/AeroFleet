@@ -296,6 +296,12 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
         .def("set_seed", &Simulator::setSeed, py::arg("seed"))
         .def_property_readonly("simulated_time", &Simulator::getSimulatedTime)
         .def_property_readonly("step_count", &Simulator::getStepCount)
-        .def_property_readonly("fleet_size", &Simulator::getFleetSize);
+        .def_property_readonly("fleet_size", &Simulator::getFleetSize)
+        .def_property_readonly("max_horizontal_speed", [](const Simulator& self) {
+            return self.getConfig().fleet.maxHorizontalSpeed;
+        })
+        .def_property_readonly("max_vertical_speed", [](const Simulator& self) {
+            return self.getConfig().fleet.maxVerticalSpeed;
+        });
 }
 

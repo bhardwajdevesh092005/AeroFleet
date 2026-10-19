@@ -38,6 +38,8 @@ WaypointController::WaypointController(const WaypointControllerConfig& config)
     m_config.maxVerticalSpeed = sanitizePositive(m_config.maxVerticalSpeed, 5.0);
     if (!std::isfinite(m_config.verticalEscapeBias)) m_config.verticalEscapeBias = 0.0;
     if (!std::isfinite(m_config.tangentialGain)) m_config.tangentialGain = 0.0;
+    m_config.dynamicAvoidanceDistance = sanitizePositive(m_config.dynamicAvoidanceDistance, 8.0);
+    m_config.dynamicAvoidanceHorizon = sanitizePositive(m_config.dynamicAvoidanceHorizon, 2.0);
 }
 
 WaypointController::WaypointController(const KinematicsConfig& kinematics)
@@ -143,6 +145,58 @@ VelocityCommand WaypointController::computeAction(
     }
 
     command.desiredVelocity = desired;
+    return command;
+}
+
+VelocityCommand WaypointController::computeActionWithTraffic(
+    const UAVState& uav,
+    const CityMap& map,
+    const std::vector<UAVState>& traffic,
+    double dt
+) const {
+    VelocityCommand command = computeAction(uav, map, dt);
+    if (dt <= 0.0) return command;
+
+    Vec3 avoidance{};
+    for (const auto& other : traffic) {
+        if (other.id == uav.id || other.mode == UAVMode::EMERGENCY || other.mode == UAVMode::OFFLINE) continue;
+
+        const Vec3 relativePosition = other.position - uav.position;
+        const Vec3 relativeVelocity = other.velocity - command.desiredVelocity;
+        const double relativeSpeedSq = relativeVelocity.lengthSquared();
+        double timeToClosest = 0.0;
+        if (relativeSpeedSq > 1e-9) {
+            timeToClosest = MathUtils::clamp(
+                -relativePosition.dot(relativeVelocity) / relativeSpeedSq,
+                0.0,
+                m_config.dynamicAvoidanceHorizon
+            );
+        }
+
+        const Vec3 closestSeparation = relativePosition + relativeVelocity * timeToClosest;
+        const double separation = closestSeparation.length();
+        if (separation >= m_config.dynamicAvoidanceDistance) continue;
+
+        Vec3 away = -closestSeparation.normalized();
+        if (away.lengthSquared() <= 1e-12) {
+            away = Vec3(-relativeVelocity.y, relativeVelocity.x, 0.0).normalized();
+            if (away.lengthSquared() <= 1e-12) {
+                away = uav.id < other.id ? Vec3(0.0, 1.0, 0.0) : Vec3(0.0, -1.0, 0.0);
+            }
+        }
+        const double urgency = 1.0 - separation / m_config.dynamicAvoidanceDistance;
+        avoidance += away * (m_config.maxHorizontalSpeed * urgency);
+    }
+
+    command.desiredVelocity = clampHorizontal(
+        command.desiredVelocity + avoidance,
+        m_config.maxHorizontalSpeed
+    );
+    command.desiredVelocity.z = MathUtils::clamp(
+        command.desiredVelocity.z,
+        -m_config.maxVerticalSpeed,
+        m_config.maxVerticalSpeed
+    );
     return command;
 }
 

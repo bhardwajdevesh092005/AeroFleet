@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include "control/INavigationPolicy.hpp"
 #include "physics/Kinematics.hpp"
 
@@ -15,6 +16,8 @@ struct WaypointControllerConfig {
     double maxVerticalSpeed{5.0};
     double verticalEscapeBias{1.5};
     double tangentialGain{0.2};
+    double dynamicAvoidanceDistance{8.0};
+    double dynamicAvoidanceHorizon{2.0};
 };
 
 /**
@@ -34,6 +37,17 @@ public:
         const CityMap& map,
         double dt
     ) const override;
+
+    /**
+     * @brief Heuristic action with deterministic short-horizon separation from
+     * other UAVs. The base policy interface remains usable without fleet data.
+     */
+    [[nodiscard]] VelocityCommand computeActionWithTraffic(
+        const UAVState& uav,
+        const CityMap& map,
+        const std::vector<UAVState>& traffic,
+        double dt
+    ) const;
 
     [[nodiscard]] const WaypointControllerConfig& getConfig() const noexcept { return m_config; }
 

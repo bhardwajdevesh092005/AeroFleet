@@ -8,10 +8,12 @@ RequestGenerator::RequestGenerator(
     const RequestSettings& settings,
     const CityMap& map,
     double nominalSpeed,
-    uint64_t seed
+    uint64_t seed,
+    double deliveryAltitude
 ) : m_settings(settings),
     m_map(map),
     m_nominalSpeed(nominalSpeed > 0.1 ? nominalSpeed : 10.0),
+    m_deliveryAltitude(std::isfinite(deliveryAltitude) ? std::max(map.worldMin.z + 1.0, deliveryAltitude) : map.worldMin.z + 15.0),
     m_initialSeed(seed),
     m_rng(seed) {
     m_arrivalRatePerSec = std::max(1e-4, m_settings.arrivalRatePerMin / 60.0);
@@ -45,6 +47,7 @@ DeliveryRequest RequestGenerator::generateSingle(double currentTime) {
         storeId = m_map.stores[sIdx].id;
         pickup = m_map.stores[sIdx].position;
     }
+    pickup.z = std::max(pickup.z, m_deliveryAltitude);
 
     int32_t customerId = 0;
     Vec3 dropoff(100.0, 100.0, 15.0);
@@ -54,6 +57,7 @@ DeliveryRequest RequestGenerator::generateSingle(double currentTime) {
         customerId = m_map.customers[cIdx].id;
         dropoff = m_map.customers[cIdx].position;
     }
+    dropoff.z = std::max(dropoff.z, m_deliveryAltitude);
 
     // Sample payload mass in [minPayloadKg, maxPayloadKg]
     std::uniform_real_distribution<double> payloadDist(m_settings.minPayloadKg, m_settings.maxPayloadKg);

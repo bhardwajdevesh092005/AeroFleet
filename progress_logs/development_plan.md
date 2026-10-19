@@ -1,6 +1,6 @@
 # AeroFleet: 20-Step Phase-Wise Development and Testing Plan
 
-> **Progress snapshot (2026-10-19):** Steps 01–10 are implemented; Steps 11–20 are pending. The current clean Release build and all 11 CTest suites pass. See [README.md](README.md) for the ledger and [testing_and_integration_coverage.md](testing_and_integration_coverage.md) for current test evidence and integration boundaries. The milestones below remain targets; later visualization, telemetry, Python/RL, and ONNX work has not been completed.
+> **Progress snapshot (2026-10-19):** Steps 01–14 are implemented. Debug and Release builds each pass all 16 CTest tests, including pybind11 bindings and Gymnasium navigation integration. Step 14 checker warnings and test evidence are recorded in [step_14_gymnasium_navigation.md](step_14_gymnasium_navigation.md). Steps 15–20 remain pending. Historical milestones below are targets; implementation status is tracked in [README.md](README.md).
 
 ## 1. Executive Summary & Architectural Overview
 

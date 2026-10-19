@@ -19,7 +19,8 @@ public:
         const RequestSettings& settings,
         const CityMap& map,
         double nominalSpeed = 10.0,
-        uint64_t seed = 42
+        uint64_t seed = 42,
+        double deliveryAltitude = 15.0
     );
 
     /**
@@ -54,6 +55,7 @@ private:
     RequestSettings m_settings;
     CityMap m_map;
     double m_nominalSpeed{10.0};
+    double m_deliveryAltitude{15.0};
     uint64_t m_initialSeed{42};
     std::mt19937_64 m_rng;
     std::uniform_real_distribution<double> m_uniformDist{0.0, 1.0};

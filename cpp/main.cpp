@@ -3,6 +3,7 @@
 #include <vector>
 #include <chrono>
 #include <iomanip>
+#include <algorithm>
 
 #include "core/Config.hpp"
 #include "core/Types.hpp"
@@ -109,7 +110,9 @@ int main(int argc, char* argv[]) {
 
     // 2. Initialize simulation components
     FleetManager fleet(config.fleet, config.energy, map, config.world.defaultSpawnAltitude);
-    RequestGenerator requestGen(config.requests, map, config.fleet.maxHorizontalSpeed, config.simulation.randomSeed);
+    RequestGenerator requestGen(config.requests, map, config.fleet.maxHorizontalSpeed,
+                                config.simulation.randomSeed,
+                                config.world.zMin + config.world.defaultSpawnAltitude);
 
     WaypointControllerConfig navConfig;
     navConfig.maxHorizontalSpeed = config.fleet.maxHorizontalSpeed;
@@ -209,9 +212,33 @@ int main(int argc, char* argv[]) {
                 pendingRequests.insert(pendingRequests.end(), newRequests.begin(), newRequests.end());
             }
 
+            // Expire requests while they are still waiting. Assigned requests
+            // leave this queue immediately after dispatch below.
+            for (auto it = pendingRequests.begin(); it != pendingRequests.end();) {
+                const bool timedOut = currentTime > it->creationTime + config.requests.requestTimeoutSeconds;
+                if (it->status == RequestStatus::PENDING && (it->isExpired(currentTime) || timedOut)) {
+                    it->transitionTo(RequestStatus::EXPIRED, currentTime);
+                    metrics.recordRequestExpired(*it, currentTime);
+                    if (logEvents) logger.log(currentTime, SimulationEventType::REQUEST_EXPIRED, it->id);
+                    it = pendingRequests.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+
             // 2. Dispatch coordinator at coordinator rate (e.g. 1 Hz)
             if (currentTime - lastCoordinatorDispatchTime >= config.simulation.dtCoordinator) {
                 coordinator.dispatch(fleet, pendingRequests, map, currentTime);
+                for (const auto& req : pendingRequests) {
+                    if (req.status == RequestStatus::ASSIGNED && logEvents) {
+                        logger.log(currentTime, SimulationEventType::REQUEST_ASSIGNED,
+                                   req.id, req.assignedUavId);
+                    }
+                }
+                pendingRequests.erase(
+                    std::remove_if(pendingRequests.begin(), pendingRequests.end(),
+                                   [](const DeliveryRequest& req) { return req.status != RequestStatus::PENDING; }),
+                    pendingRequests.end());
                 lastCoordinatorDispatchTime = currentTime;
             }
 
@@ -238,12 +265,13 @@ int main(int argc, char* argv[]) {
 
             // 4. Compute navigation actions and integrate rigid kinematics
             double totalPowerWatts = 0.0;
+            const std::vector<UAVState> trafficSnapshot = fleet.getAllUAVs();
             for (auto& uav : fleet.getAllUAVs()) {
                 VelocityCommand action;
                 if (uav.mode == UAVMode::FLYING_TO_PICKUP ||
                     uav.mode == UAVMode::FLYING_TO_DESTINATION ||
                     uav.mode == UAVMode::RETURNING_TO_CHARGE) {
-                    action = navigator.computeAction(uav, map, dt);
+                    action = navigator.computeActionWithTraffic(uav, map, trafficSnapshot, dt);
                 }
                 integrator.stepVelocityCommand(uav, action, dt);
                 fleet.getBatteryModel().stepDischarge(uav, dt);
@@ -262,6 +290,24 @@ int main(int argc, char* argv[]) {
                                    c.uavIdA,
                                    c.type == CollisionType::BUILDING ? c.buildingId : c.uavIdB);
                     }
+
+                    const auto abortCrashedAssignment = [&](UAVId id) {
+                        DeliveryRequest requeued;
+                        if (fleet.abortAssignment(id, requeued)) {
+                            requeuedRequests.push_back(requeued);
+                            if (logEvents) logger.log(currentTime, SimulationEventType::REQUEST_REQUEUED,
+                                                      requeued.id, id);
+                        }
+                        if (id >= 0 && static_cast<size_t>(id) < fleet.size()) {
+                            fleet.getUAV(static_cast<size_t>(id)).mode = UAVMode::EMERGENCY;
+                        }
+                    };
+                    abortCrashedAssignment(c.uavIdA);
+                    if (c.type == CollisionType::UAV_UAV) abortCrashedAssignment(c.uavIdB);
+                }
+                if (!requeuedRequests.empty()) {
+                    pendingRequests.insert(pendingRequests.end(), requeuedRequests.begin(), requeuedRequests.end());
+                    requeuedRequests.clear();
                 }
                 allCollisionEvents.insert(allCollisionEvents.end(), newCollisions.begin(), newCollisions.end());
             }

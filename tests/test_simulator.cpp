@@ -1,4 +1,7 @@
 #include <iostream>
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 #include <cmath>
 #include <vector>
@@ -146,6 +149,25 @@ void testSimulatorDeterminism() {
     std::cout << "  -> Passed: Bit-for-bit identical trajectory across independent instances with seed 999.\n";
 }
 
+void testPendingRequestsExpireAndLeaveQueue() {
+    SimulationConfig config = SimulationConfig::createDefault();
+    config.fleet.numUavs = 1;
+    config.requests.arrivalRatePerMin = 60.0;
+    config.requests.requestTimeoutSeconds = 1.0;
+    Simulator sim(config);
+    sim.getFleet().getUAV(0).mode = UAVMode::EMERGENCY;
+
+    for (int i = 0; i < 100; ++i) sim.stepHeuristic();
+
+    const auto snapshot = sim.getSnapshot();
+    if (sim.getMetrics().getSnapshot().totalRequestsExpired == 0) {
+        throw std::runtime_error("pending request timeout was not recorded");
+    }
+    if (snapshot.activeRequests.size() > 2) {
+        throw std::runtime_error("timed-out requests accumulated in the pending queue");
+    }
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "  AeroFleet Simulator C++ Test Suite    \n";
@@ -156,6 +178,7 @@ int main() {
     testHeuristicStepping();
     testActionStepping();
     testSimulatorDeterminism();
+    testPendingRequestsExpireAndLeaveQueue();
 
     std::cout << "========================================\n";
     std::cout << "  All Simulator C++ Tests PASSED! (5/5) \n";

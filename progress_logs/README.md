@@ -2,7 +2,7 @@
 
 This directory serves as the persistent audit trail and progress ledger for the 20-step implementation of the **AeroFleet** autonomous UAV delivery fleet simulation.
 
-> **Current implementation snapshot (2026-10-19):** Steps 01–10 are implemented. Steps 11–20 remain pending. A clean Release build, all 11 registered CTest suites, all 11 test executables (67 named test cases), the `AeroFleet --headless` startup check, and `git diff --check` passed. See [testing_and_integration_coverage.md](testing_and_integration_coverage.md) for the latest verification record. Historical outputs in individual step logs describe the results at the time each step was completed.
+> **Current implementation snapshot (2026-10-19):** Steps 01–14 are implemented. Debug and Release builds pass all 16 CTest tests, including pybind11 bindings and Gymnasium navigation checks. The Gymnasium checker emits two non-failing warnings about the unbounded observation Box; see [Step 14](step_14_gymnasium_navigation.md). Steps 15–20 remain pending. Historical outputs in individual step logs describe results at the time they were completed.
 
 ## Structure & Conventions
 Each major development step is broken down into granular sub-parts and documented with:
@@ -31,7 +31,7 @@ Each major development step is broken down into granular sub-parts and documente
 | **11** | Real-Time 3D Visualization Engine (raylib) & Live HUD | **COMPLETED** | [step_11_visualization.md](step_11_visualization.md) |
 | **12** | High-Speed Simulation Runner, Telemetry & Metrics Recorder | **COMPLETED** | [step_12_telemetry_and_runner.md](step_12_telemetry_and_runner.md) |
 | **13** | pybind11 C++ Simulator Bindings | **COMPLETED** | [step_13_pybind11_bindings.md](step_13_pybind11_bindings.md) |
-| **14** | Gymnasium Navigation Environment (AeroFleetNavEnv) | *PENDING* | - |
+| **14** | Gymnasium Navigation Environment (AeroFleetNavEnv) | **COMPLETED** | [step_14_gymnasium_navigation.md](step_14_gymnasium_navigation.md) |
 | **15** | Cross-Language Differential Physics & Seed Reproducibility | *PENDING* | - |
 | **16** | Navigation Policy Training (PPO) & Curriculum Learning | *PENDING* | - |
 | **17** | ONNX Model Export, Optimization & Dual-Inference Parity | *PENDING* | - |
@@ -41,5 +41,5 @@ Each major development step is broken down into granular sub-parts and documente
 
 ### Current boundary
 
-The current code integrates generated requests, heuristic dispatch, waypoint navigation, kinematics, collision checks, battery discharge, and the fleet delivery lifecycle in integration tests. A continuously running top-level simulator, real-time visualization, telemetry/metrics, Python bindings and RL/ONNX pipelines are not implemented yet.
+The C++ runner composes request generation, heuristic dispatch/navigation, fleet lifecycle, physics, collisions, visualization, and metrics. Step 14 establishes a provisional normalized 3D desired-velocity action for the learning-controlled UAV; C++ kinematics continue to enforce physical limits. The environment and action mapping are scaffolding for training, not a trained policy. Cross-language parity, RL training, and ONNX deployment remain future work. In the current seed-42 10-UAV run, collisions and low on-time delivery still limit baseline performance.
 

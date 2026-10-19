@@ -1,5 +1,9 @@
 # AeroFleet Test Coverage Update
 
+> The 11-suite/67-case result below is an earlier snapshot. Current validation is documented in [post_pull_validation.md](post_pull_validation.md) and [Step 14](step_14_gymnasium_navigation.md): Debug and Release CTest each pass 16/16 tests, including Python bindings and Gymnasium integration.
+
+> **Step 14 check (2026-10-19):** pybind11 built against Python 3.14.4; Debug and Release CTest each passed **16/16**. The direct bindings suite passed 8 checks and the Gymnasium suite passed 10 tests, including 100 random episodes. The Gymnasium checker warns that observation bounds are infinite; this is recorded for review before PPO training.
+
 ## Cross-Module Integration Coverage
 
 Added `tests/test_integration.cpp` to exercise interactions not covered by the subsystem tests:
@@ -18,4 +22,4 @@ The repository also has focused suites for configuration, math/geometry, world g
 
 ## Coverage Boundary
 
-Phase IV (Visualization & Telemetry) is now complete: the simulation features an authoritative fixed-step clock (`SimulationClock`), immutable state snapshots (`WorldState`), multi-mode 3D camera controller (`CameraController`), 3D raylib renderer with HUD (`Renderer`), high-speed in-memory ring-buffer event logger (`EventLogger`), and fleet KPI metrics engine (`MetricsTracker`). The next phase is Phase V: Python Gymnasium RL Environment, starting with pybind11 C++ Simulator Bindings (Step 13).
+Phase IV (Visualization & Telemetry) is complete. Step 13 bindings and Step 14's `AeroFleetNavEnv` wrapper are implemented. CMake conditionally registers the binding and Gymnasium suites when dependencies are available. The current validation passed all 16 CTest tests in Debug and Release. See [step_14_gymnasium_navigation.md](step_14_gymnasium_navigation.md) for the action/observation contract and checker warnings.
