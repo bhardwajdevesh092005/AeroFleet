@@ -46,6 +46,9 @@ add_library(AeroFleetCore STATIC
     cpp/world/WorldGenerator.cpp
     cpp/physics/Kinematics.cpp
     cpp/physics/CollisionSystem.cpp
+    cpp/physics/BatteryModel.cpp
+    cpp/requests/RequestGenerator.cpp
+    cpp/fleet/FleetManager.cpp
 )
 
 target_include_directories(AeroFleetCore PUBLIC
@@ -104,3 +107,27 @@ add_executable(test_collision
 target_link_libraries(test_collision PRIVATE AeroFleetCore)
 add_test(NAME CollisionTests COMMAND test_collision)
 set_tests_properties(CollisionTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: High-Fidelity Battery, Energy & Charging Station Mechanics
+add_executable(test_battery
+    tests/test_battery.cpp
+)
+target_link_libraries(test_battery PRIVATE AeroFleetCore)
+add_test(NAME BatteryTests COMMAND test_battery)
+set_tests_properties(BatteryTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: Delivery Request Generator & Demand Modeling
+add_executable(test_requests
+    tests/test_requests.cpp
+)
+target_link_libraries(test_requests PRIVATE AeroFleetCore)
+add_test(NAME RequestTests COMMAND test_requests)
+set_tests_properties(RequestTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit tests: Fleet State Machine & UAV Operational Lifecycle
+add_executable(test_fleet
+    tests/test_fleet.cpp
+)
+target_link_libraries(test_fleet PRIVATE AeroFleetCore)
+add_test(NAME FleetTests COMMAND test_fleet)
+set_tests_properties(FleetTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
