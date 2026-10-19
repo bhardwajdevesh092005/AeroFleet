@@ -20,12 +20,12 @@ Each major development step is broken down into granular sub-parts and documente
 | **02** | 3D Vector Math, Spatial Primitives & Bounding Volumes | **COMPLETED** | [step_02_math_and_geometry.md](step_02_math_and_geometry.md) |
 | **03** | Procedural City Map Generator & World Representation | **COMPLETED** | [step_03_world_generator.md](step_03_world_generator.md) |
 | **04** | UAV Rigid Kinematics & Motion Integrator | **COMPLETED** | [step_04_kinematics.md](step_04_kinematics.md) |
-| **05** | Continuous Collision Detection (CCD) & Conflict Resolution | *PENDING* | - |
-| **06** | High-Fidelity Battery, Energy & Charging Station Mechanics | *PENDING* | - |
-| **07** | Delivery Request Generator & Demand Modeling | *PENDING* | - |
-| **08** | Fleet State Machine & UAV Operational Lifecycle | *PENDING* | - |
-| **09** | Baseline Heuristic Navigation & Deterministic Waypoint Controller | *PENDING* | - |
-| **10** | Central Heuristic Dispatcher / Coordinator Baseline | *PENDING* | - |
+| **05** | Continuous Collision Detection (CCD) & Conflict Resolution | **COMPLETED** | [step_05_collision_detection.md](step_05_collision_detection.md) |
+| **06** | High-Fidelity Battery, Energy & Charging Station Mechanics | **COMPLETED** | [step_06_battery_and_energy.md](step_06_battery_and_energy.md) |
+| **07** | Delivery Request Generator & Demand Modeling | **COMPLETED** | [step_07_request_generator.md](step_07_request_generator.md) |
+| **08** | Fleet State Machine & UAV Operational Lifecycle | **COMPLETED** | [step_08_fleet_manager.md](step_08_fleet_manager.md) |
+| **09** | Baseline Heuristic Navigation & Deterministic Waypoint Controller | **COMPLETED** | [step_09_heuristic_navigation.md](step_09_heuristic_navigation.md) |
+| **10** | Central Heuristic Dispatcher / Coordinator Baseline | **COMPLETED** | [step_10_heuristic_coordinator.md](step_10_heuristic_coordinator.md) |
 | **11** | Real-Time 3D Visualization Engine (raylib) & Live HUD | *PENDING* | - |
 | **12** | High-Speed Simulation Runner, Telemetry & Metrics Recorder | *PENDING* | - |
 | **13** | pybind11 C++ Simulator Bindings | *PENDING* | - |
