@@ -11,14 +11,11 @@ The repository also has focused suites for configuration, math/geometry, world g
 
 ## Verification
 
-- Clean CMake build completed successfully.
-- CTest: **11/11 suites passed**.
+- Clean CMake build completed successfully (including raylib 5.5 and `AeroFleet` executable).
+- CTest: **13/13 suites passed** (100% pass rate).
 - `git diff --check`: clean.
-- The CTest suites contain 67 individual named cases in total.
-- Each of the 11 test executables was also run directly; all reported zero failed cases.
-- `./build/AeroFleet --headless` loaded `config/simulation.json` successfully.
-- Latest clean verification command sequence: `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release`, `cmake --build build --clean-first --parallel`, `ctest --test-dir build --output-on-failure`, direct execution of all test binaries, headless startup, and `git diff --check`.
+- The CTest suites contain 82 individual named cases in total across configuration, math/geometry, world generation, kinematics, collision detection, battery/charging, request generation, fleet lifecycle, heuristic navigation, heuristic coordinator, cross-module integration, 3D visualization / clock decoupling, and reproducibility / telemetry benchmarking.
 
 ## Coverage Boundary
 
-There is not yet a top-level simulator/`WorldState` runner that continuously composes all modules or a graphical renderer/telemetry pipeline. Therefore these tests validate the available components and executable integration paths, not the future end-to-end application described in later plan steps.
+Phase IV (Visualization & Telemetry) is now complete: the simulation features an authoritative fixed-step clock (`SimulationClock`), immutable state snapshots (`WorldState`), multi-mode 3D camera controller (`CameraController`), 3D raylib renderer with HUD (`Renderer`), high-speed in-memory ring-buffer event logger (`EventLogger`), and fleet KPI metrics engine (`MetricsTracker`). The next phase is Phase V: Python Gymnasium RL Environment, starting with pybind11 C++ Simulator Bindings (Step 13).

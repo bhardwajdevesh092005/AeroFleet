@@ -2,6 +2,10 @@
 
 #include <cmath>
 
+#if defined(PI)
+    #undef PI
+#endif
+
 namespace aerofleet {
 
 namespace MathUtils {
