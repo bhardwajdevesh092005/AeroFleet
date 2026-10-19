@@ -1,5 +1,10 @@
 # AeroFleet: Complete System Design and Implementation Guide
 
+> **Implementation alignment:** This document describes the intended end
+> state. It is not a claim that the RL policies have been trained or deployed.
+> Current implementation status and pre-training design gates are in
+> [architecture_review.md](architecture_review.md) and the [progress ledger](README.md).
+
 ## 1. Project overview
 
 AeroFleet is a reinforcement-learning-based simulation of an urban UAV
@@ -38,7 +43,8 @@ reinforcement-learning/training layer**.
     integration, collision detection, battery updates, delivery state
     transitions, and the final runtime.
 -   Python uses Gymnasium to define the learning interface and uses an
-    RL library to train policies.
+    RL library to train both policies. The RL algorithms, rollout handling,
+    and optimizer run in Python; C++ does not train the policies.
 -   A binding layer such as pybind11 allows Python to call the same C++
     simulation library during training.
 -   The trained neural-network actor is exported to ONNX and loaded in
@@ -73,12 +79,13 @@ the interface through which the RL algorithm interacts with it.
 
 ``` text
                  TRAINING TIME
-  Python training scripts
+  Python RL trainer (policy, rollout buffer, optimizer)
+          | action
           |
           v
   Gymnasium environment wrapper
           |
-       pybind11
+   pybind11: step(action)
           |
           v
   Shared C++ simulation library
@@ -86,9 +93,12 @@ the interface through which the RL algorithm interacts with it.
   - UAV dynamics
   - collision detection
   - battery and delivery rules
+          | observation, reward, episode status
+          v
+  Gymnasium wrapper returns transition to Python trainer
           |
           v
-  PPO / other RL algorithm
+  Python trainer collects rollouts and updates policy
           |
           v
   Trained policy checkpoints
@@ -253,14 +263,13 @@ A simple first model is:
 
 For a simple constant-velocity step:
 
-\[ p\_{t+`\Delta `{=tex}t} = p_t + v_t `\Delta `{=tex}t \]
+`p(t + dt) = p(t) + v(t) * dt`
 
 For an acceleration-based model:
 
-\[ v\_{t+`\Delta `{=tex}t} = v_t + a_t `\Delta `{=tex}t \]
+`v(t + dt) = v(t) + a(t) * dt`
 
-\[ p\_{t+`\Delta `{=tex}t} = p_t +
-v\_{t+`\Delta `{=tex}t}`\Delta `{=tex}t \]
+`p(t + dt) = p(t) + v(t + dt) * dt`
 
 Choose one update convention and use it consistently in training and
 deployment. A more realistic model can be added later, but it is better
@@ -323,11 +332,7 @@ For a first model, use battery percentage from 0 to 100 and subtract
 energy based on elapsed time, movement, and optional payload. A basic
 model could be:
 
-\[ E\_{`\text{used}`{=tex}} = c\_{`\text{idle}`{=tex}}`\Delta `{=tex}t +
-c\_{`\text{distance}`{=tex}}`\lVert `{=tex}`\Delta `{=tex}p`\rVert `{=tex}+
-c\_{`\text{climb}`{=tex}}`\max`{=tex}(0,`\Delta `{=tex}z) +
-c\_{`\text{payload}`{=tex}}m`\lVert `{=tex}`\Delta `{=tex}p`\rVert`{=tex}
-\]
+`E_used = c_idle * dt + c_distance * ||dp|| + c_climb * max(0, dz) + c_payload * mass * ||dp||`
 
 The coefficients are simulation parameters that should be calibrated for
 stable behavior, not claims about a real drone.
@@ -397,11 +402,10 @@ Keep these transitions explicit. Avoid setting arbitrary status fields
 from many unrelated parts of the code.
 
 For the first demand model, use a Poisson arrival process with rate
-(`\lambda`{=tex}) requests per simulated time unit. Inter-arrival times
+(`lambda`) requests per simulated time unit. Inter-arrival times
 can be sampled from an exponential distribution:
 
-\[ `\Delta `{=tex}t = -`\frac{\ln(U)}{\lambda}`{=tex}, `\qquad `{=tex}U
-`\sim `{=tex}`\operatorname{Uniform}`{=tex}(0,1) \]
+`dt = -ln(U) / lambda`, where `U` is uniform on `(0, 1)`.
 
 Use a seeded random-number generator. This allows the same request
 stream to be replayed when comparing policies.
@@ -887,10 +891,7 @@ Possible reward components:
 
 A conceptual form is:
 
-\[ R = w_d N\_{`\text{delivered}`{=tex}} - w_w
-T\_{`\text{waiting}`{=tex}} - w_l N\_{`\text{late}`{=tex}} - w_e
-E\_{`\text{used}`{=tex}} - w_f N\_{`\text{failed}`{=tex}} - w_c
-N\_{`\text{collisions}`{=tex}} \]
+`R = w_d * delivered - w_w * waiting_time - w_l * late - w_e * energy_used - w_f * failed - w_c * collisions`
 
 The terms and weights must be designed so the policy cannot exploit a
 loophole. For example, if only successful deliveries are rewarded and
@@ -1314,7 +1315,7 @@ true:
 -   Python and C++ inference pipelines agree on fixed test cases within
     defined tolerances.
 -   The coordinator policy is trained and evaluated against a heuristic
-    baseline, if coordinator RL is included in the target scope.
+    baseline as a required project objective.
 -   The live raylib visualization shows the real simulator state.
 -   Metrics are recorded and reproducible benchmarks show how the
     learned policies compare with baselines.
@@ -1333,9 +1334,11 @@ Before writing the full implementation, settle these initial choices:
 -   **Navigation action:** continuous desired velocity or acceleration.
 -   **Navigation training:** PPO as a straightforward starting point;
     compare alternatives only after a baseline works.
--   **Coordinator:** heuristic first, then a separate RL policy.
--   **Python/C++ boundary:** pybind11 for training against the C++
-    simulator.
+-   **Coordinator:** train a separate RL policy. Heuristic dispatch remains a
+    baseline for comparison and simulator validation, not the training method.
+-   **Python/C++ boundary:** Gymnasium and Python RL code perform training;
+    pybind11 connects the environment to the C++ simulator. C++ may perform
+    exported-policy inference at runtime, but does not train the policies.
 -   **Deployment:** ONNX Runtime in C++ if model export is compatible.
 -   **Rendering:** raylib reads snapshots and does not mutate simulation
     state.

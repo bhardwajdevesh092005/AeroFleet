@@ -1,6 +1,6 @@
 # AeroFleet: 20-Step Phase-Wise Development and Testing Plan
 
-> **Progress snapshot (2026-10-19):** Steps 01–14 are implemented. Debug and Release builds each pass all 16 CTest tests, including pybind11 bindings and Gymnasium navigation integration. Step 14 checker warnings and test evidence are recorded in [step_14_gymnasium_navigation.md](step_14_gymnasium_navigation.md). Steps 15–20 remain pending. Historical milestones below are targets; implementation status is tracked in [README.md](README.md).
+> **Progress snapshot (2026-10-19):** Steps 01–14 are implemented, with Step 14 now providing the Stage 1 deterministic waypoint task and 87-feature schema v2. Debug and Release each pass all 16 CTest tests, including pybind11 bindings and Gymnasium navigation integration. Gymnasium checks pass with finite observation bounds. Steps 15–20 remain pending. Historical milestones below are targets; implementation status is tracked in [README.md](README.md).
 
 ## 1. Executive Summary & Architectural Overview
 
@@ -8,12 +8,12 @@
 
 ### Architectural Core Principles
 1. **C++ as the Authoritative Simulator**: All world geometry, rigid kinematics, swept collision detection (CCD), battery discharge/recharge dynamics, delivery state machines, and real-time execution live in high-performance C++. Rendering and external wrappers are non-authoritative clients.
-2. **Python as the Learning Environment**: `pybind11` exposes the C++ simulation core to Gymnasium without duplicating physical or geometrical logic.
+2. **Python as the RL Training Runtime**: RL algorithms, policy optimization, and training loops run in Python through Gymnasium. `pybind11` lets those environments step the C++ simulation core without duplicating physical or geometrical logic. C++ does not train the policies.
 3. **Dual-Tier Hierarchical AI**:
    - **Local Navigation Controller (Policy A)**: High-frequency (10–20 Hz) continuous velocity/acceleration control with local obstacle avoidance and target tracking.
    - **Central Fleet Coordinator (Policy B)**: Low-frequency (1 Hz) combinatorial dispatch agent with action masking, managing queue throughput, battery constraints, and deadline margins.
 4. **Decoupled 3D Visualization**: raylib visualizes immutable `WorldSnapshot` instances on the main thread or render thread without mutating physical state.
-5. **Deterministic Production Pipeline**: Policies are trained in PyTorch/Gymnasium, verified for parity, exported to ONNX, and deployed natively in C++ via ONNX Runtime with an invariant Safety Layer.
+5. **Deterministic Production Pipeline**: Policies are trained in Python with Gymnasium and a Python RL library (planned PyTorch-based tooling), verified for parity, exported to ONNX, and optionally run for inference in C++ via ONNX Runtime with an invariant Safety Layer. C++ inference is deployment, not training.
 
 ---
 
@@ -512,22 +512,17 @@ flowchart TD
 ---
 
 #### Step 14: Gymnasium Navigation Environment (`AeroFleetNavEnv`)
-- **Objective**: Construct the standard Gymnasium-compliant reinforcement learning environment for single-agent and multi-agent UAV navigation.
-- **Development Scope**:
-  - Implement `python/aerofleet/nav_env.py` conforming to Gymnasium API:
-    - `__init__(self, config)`: Define `observation_space` and `action_space`.
-      - **Action Space**: `spaces.Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)` representing normalized desired velocity $[v_x, v_y, v_z]$.
-      - **Observation Space**: `spaces.Box(low=-np.inf, high=np.inf, shape=(N_obs,), dtype=np.float32)`:
-        - UAV ego-velocity (3).
-        - Relative target vector: $\mathbf{p}_{\text{target}} - \mathbf{p}_{\text{uav}}$ in spherical/Cartesian (3).
-        - Battery remaining fraction (1).
-        - Payload mass fraction (1).
-        - Local lidar/rangefinder beams: $36$ horizontal beams ($360^\circ$) + $8$ vertical elevation beams measuring distance to nearest obstacle (44).
-        - Relative vectors and velocities of $K$ nearest UAVs ($K \times 6$).
-    - `reset(self, seed=None, options=None)`: Reset C++ simulator, return `(obs, info)`.
-    - `step(self, action)`: Scale action to $[-v_{\max}, v_{\max}]$, step C++ sim, compute reward, return `(obs, reward, terminated, truncated, info)`.
-  - Implement `python/aerofleet/rewards.py`:
-    $$R_t = w_{\text{progress}} (d_{t-1} - d_t) + R_{\text{arrival}} \mathbb{I}_{\text{reached}} - R_{\text{collision}} \mathbb{I}_{\text{crash}} - w_{\text{energy}} \Delta E - w_{\text{step}}$$
+- **Implementation status (2026-10-19):** The Gymnasium/pybind11 adapter now defaults to a deterministic Stage 1 open-space waypoint task and retains `scenario="full_fleet"` for delivery-simulation integration. Observation schema v2 has 87 ordered features, body-frame kinematics, acceleration, heading and UAV mode, configuration-derived normalization, and finite bounds. Navigation reward and success/failure/truncation behavior are explicit and integration-tested. Obstacle, battery/delivery, and multi-UAV curriculum stages remain pending. See [Step 14 validation](step_14_gymnasium_navigation.md) and the [architecture review](architecture_review.md).
+- **Objective**: Provide a controlled single-UAV navigation task through the Gymnasium API, then extend it through the curriculum.
+- **Implemented contract**:
+  - Action: normalized desired velocity `[vx, vy, vz]` in `Box(-1, 1, shape=(3,))`; C++ kinematics enforce physical limits.
+  - Observation v2 (87 values): body-frame velocity (3), acceleration (3), target displacement (3), target distance (1), battery fraction (1), payload fraction (1), speed fraction (1), lidar (44), three body-frame relative UAV states (18), heading sine/cosine (2), and UAV mode/task phase one-hot (10).
+  - Python normalizes configuration-dependent values into finite bounds and exposes the feature order and schema version for future checkpoint manifests.
+  - Default reset creates one active UAV, one fixed reachable target, and open space. `options={"scenario": "full_fleet"}` selects the stochastic delivery simulator.
+  - Stage 1 reward: `-0.01 + 0.1 * clamp(d_previous - d_current, -dt * (v_horizontal + v_vertical), +dt * (v_horizontal + v_vertical))`; add `+10` for reaching within 2 m and `-10` for collision/emergency or battery-depletion failure. The fixed target avoids target-switch shaping. The Python episode limit truncates; a terminal outcome takes precedence.
+- **Remaining curriculum scope**:
+  - Add deterministic obstacle/boundary tasks, battery and pickup/delivery transitions, then multi-UAV traffic and dynamic fleet demand.
+  - Revalidate the observation bounds, reward, and termination semantics at each stage before freezing a training schema.
 - **Testing & Verification**:
   - Run standard Gymnasium environment validator:
     ```python
@@ -546,24 +541,25 @@ flowchart TD
 ---
 
 #### Step 15: Cross-Language Differential Physics & Seed Reproducibility
-- **Objective**: Mathematically prove that the Python Gymnasium environment and the pure C++ simulation engine produce identical physics and collision results.
+- **Objective**: Verify that the Python adapter maps actions, observations, rewards, termination, and seeds to the C++ simulator consistently. Since the adapter calls the same C++ engine, this is adapter parity, not an independent proof of physics correctness. Verify physics separately with C++ unit/integration tests and independent expected trajectories where practical.
 - **Development Scope**:
-  - Implement `tests/test_differential_physics.py`:
-    1. Initialize pure C++ test harness with fixed seed `42`.
-    2. Initialize Python `AeroFleetNavEnv` with the same seed `42`.
-    3. Feed an identical pseudo-random sequence of 1,000 action vectors to both instances.
-    4. At every single step, extract position, velocity, battery, and collision flags.
-    5. Compare values and compute maximum absolute discrepancy:
+  - Implement adapter-parity tests using a deterministic scenario and seed:
+    1. Compare direct C++ actions with Gymnasium-scaled actions.
+    2. Compare exposed observations, reward components, terminal flags, and collision outcomes after each transition.
+    3. Verify reset reproducibility and scenario initialization.
+    4. Use independent expected trajectories for physics checks rather than comparing two paths through the same engine.
+    5. Report numerical discrepancies with a tolerance justified by the interface types:
        $$\delta = \max_t (\|\mathbf{p}_{t}^{\text{cpp}} - \mathbf{p}_{t}^{\text{py}}\|)$$
 - **Testing & Verification**:
-  - Run `pytest tests/test_differential_physics.py`.
-  - Pass criterion: $\delta < 10^{-6}\text{ meters}$ across all 1,000 steps.
-  - Confirm collision events occur on the exact same timestep in both environments.
+  - Run deterministic adapter-parity tests through the C++ binding and Gymnasium wrapper.
+  - Compare a single transition at a time with tolerances selected for each exposed field and conversion; test longer seeded episodes for repeatability separately.
+  - Confirm that direct and wrapped commands produce the same C++ transition, reward, termination, and collision result in the same scenario.
+  - Test independent physics expectations in C++ rather than requiring the wrapper and binding to independently reproduce the same engine.
 - **Error Diagnostics & Remediation**:
-  - *Error: Drift detected after step 50 ($\delta$ grows exponentially).*
-    - Action: Check floating-point types. If C++ uses `double` but Python passes single-precision `float32` action coordinates without explicit conversion, precision will diverge. Standardize interface conversions.
-  - *Error: Collision detected in Python 1 step earlier than in C++.*
-    - Action: Verify update order. Ensure both environments execute: Policy Action $\to$ Kinematics $\to$ Collision Detection $\to$ Reward/Obs generation.
+  - *Error: Wrapped action produces a different transition from direct binding call.*
+    - Action: Check action scaling, float conversion, selected UAV, and simulator step count.
+  - *Error: Same seed produces different scenario or episode results.*
+    - Action: Check all random sources and ensure reset options and scenario generation use the seeded simulator RNG.
 
 ---
 
@@ -571,6 +567,7 @@ flowchart TD
 
 #### Step 16: Navigation Policy Training (PPO) & Curriculum Learning
 - **Objective**: Train a robust, collision-free local navigation neural network policy using Proximal Policy Optimization (PPO) under an automated curriculum.
+- **Entry criteria:** The Step 14 Stage 1 task now meets the initial PPO gates: deterministic reachable target, versioned finite normalized observation schema, explicit task reward/outcomes, and seeded reset coverage. Before advancing beyond Stage 1, add and validate the obstacle, delivery/battery, and multi-UAV scenarios; coordinator training remains after the navigation policy is stable and frozen.
 - **Development Scope**:
   - Implement `python/train_nav.py` using Stable-Baselines3 or CleanRL:
     - Model: Actor-Critic MLP (e.g., $[256, 256]$ hidden layers with `tanh` or `ELU` activations).

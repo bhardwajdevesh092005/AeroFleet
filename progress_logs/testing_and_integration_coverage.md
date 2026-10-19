@@ -2,7 +2,7 @@
 
 > The 11-suite/67-case result below is an earlier snapshot. Current validation is documented in [post_pull_validation.md](post_pull_validation.md) and [Step 14](step_14_gymnasium_navigation.md): Debug and Release CTest each pass 16/16 tests, including Python bindings and Gymnasium integration.
 
-> **Step 14 check (2026-10-19):** pybind11 built against Python 3.14.4; Debug and Release CTest each passed **16/16**. The direct bindings suite passed 8 checks and the Gymnasium suite passed 10 tests, including 100 random episodes. The Gymnasium checker warns that observation bounds are infinite; this is recorded for review before PPO training.
+> **Latest Step 14 check (2026-10-19):** pybind11 built against Python 3.14.4; Debug and Release CTest each passed **16/16**. The direct bindings suite passed 8 checks and the Gymnasium suite passed **13 tests**, including deterministic goal arrival, finite normalized observations, full-fleet observation coverage, and random-action smoke episodes. Gymnasium `check_env` passes without observation-bound warnings.
 
 ## Cross-Module Integration Coverage
 
@@ -22,4 +22,4 @@ The repository also has focused suites for configuration, math/geometry, world g
 
 ## Coverage Boundary
 
-Phase IV (Visualization & Telemetry) is complete. Step 13 bindings and Step 14's `AeroFleetNavEnv` wrapper are implemented. CMake conditionally registers the binding and Gymnasium suites when dependencies are available. The current validation passed all 16 CTest tests in Debug and Release. See [step_14_gymnasium_navigation.md](step_14_gymnasium_navigation.md) for the action/observation contract and checker warnings.
+Phase IV (Visualization & Telemetry) is complete. Step 13 bindings and Step 14 Stage 1 navigation environment are implemented. CMake conditionally registers the binding and Gymnasium suites when dependencies are available. Debug and Release each pass all 16 CTest tests. See [step_14_gymnasium_navigation.md](step_14_gymnasium_navigation.md) for the action/observation contract and remaining curriculum stages.

@@ -1,58 +1,45 @@
 # AeroFleet
-### An RL Based UAV delivery based multi-agent system along with a central RL based fleet coordinator.
 
-<br>
-<p align="center">
-</p>
-<p align="center">
-<img style = "left-margin: auto" src="assets/AeroFleet.svg" alt="Project Screenshot" width="25%">
-<br>
-A high level design objective of the project.
-</p>
+AeroFleet is a research simulator for urban UAV delivery with two planned
+reinforcement-learning policies:
 
+1. A shared navigation policy controls an assigned UAV's local motion toward
+   its current pickup, delivery, or charging waypoint.
+2. A fleet coordinator chooses which feasible request to assign to which UAV.
 
-## Modules
-- Request Generator
-- Central Coordinator
-- UAV Agent
-- City Simulator
-- Traning Module (Central Coordinator)
-- Training Module (UAV Agent)
+C++ is the authoritative simulation layer for world state, UAV dynamics,
+requests, energy, and collisions. RL algorithms and training loops run in
+Python through Gymnasium, calling the C++ simulator through pybind11. C++ is
+not used to train the policies; the intended final runtime may run exported
+policy inference from C++ and render read-only simulation snapshots with
+raylib.
 
-## The Training Loop Architecture
-Policy A: Individual UAV agent
+## Current implementation
 
-Objective: execute an assigned delivery safely and efficiently.
-Observation
-- Drone position, velocity, and orientation.
-- Relative position of the current waypoint.
-- Remaining battery and payload.
-- Nearby obstacles and nearby UAVs.
-- Optionally, wind and other environmental conditions.
-Action
-Continuous desired velocity or acceleration, subject to flight constraints.
-Reward
-- Positive reward for progress toward the waypoint.
-- Large penalty for collision.
-- Energy consumption penalty.
-- Positive reward for reaching the waypoint.
-- Penalties for unsafe or prolonged flight.
+The C++ simulator, heuristic navigation and dispatch baselines, delivery
+lifecycle, visualization, telemetry, pybind11 module, and a single-UAV
+Gymnasium environment are implemented. The environment defaults to a
+deterministic open-space waypoint task with a finite, normalized 87-feature
+observation. Debug and Release validation each pass 16/16 CTest tests; the
+Gymnasium checker passes without observation-bound warnings.
 
-Policy B: Central coordinator
+No RL agent has been trained yet. The waypoint task is Stage 1 only; obstacle,
+battery/delivery, and multi-UAV curriculum stages remain. Both UAV navigation
+and central fleet coordination are planned RL policies.
 
-Objective: maximize fleet-level delivery performance.
-Observation
-- Pending requests, their ages, priorities and destinations.
-- UAV positions, battery, payload capacity and operational status.
-- Estimated travel times and energy requirements.
-- Current assignments and estimated completion times.
-- Queue length, recent delivery throughput and missed deadlines.
-Action
-Assign a feasible request to a UAV, defer a request, or wait for more information. Later, you can add reassignment, charging and fleet repositioning decisions.
-Reward
-- Successful deliveries and high throughput.
-- Lower delivery latency and energy consumption.
-- Penalties for missed deadlines, failed requests and unnecessary waiting.
-- Penalties for collisions or unsafe assignments, although physical safety must still be enforced independently.
+See [the progress ledger](progress_logs/README.md), [the implementation plan](progress_logs/development_plan.md), [the complete design guide](progress_logs/AeroFleet_Complete_Project_Design.md), and [the architecture review](progress_logs/architecture_review.md).
 
-## RL Traning Architecture
+## Build and test
+
+The C++ project uses CMake. The optional Python module requires matching
+Python development headers and pybind11. Gymnasium environment tests also
+require the packages listed in [requirements-rl.txt](requirements-rl.txt).
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+Python RL training, model export, and ONNX Runtime deployment are future
+milestones. See the progress ledger for their status.

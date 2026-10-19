@@ -77,6 +77,9 @@ def test_observation_numpy():
     # 1. Single observation inspection
     obs0 = sim.get_observation(0)
     assert obs0.uav_id == 0
+    assert len(obs0.mode_one_hot) == 10
+    assert sum(obs0.mode_one_hot) == 1.0
+    assert np.isfinite([obs0.ego_acceleration.x, obs0.heading_sin, obs0.heading_cos]).all()
     assert len(obs0.lidar_beams) == 44
     assert len(obs0.nearby_uavs) == 18
     assert abs(obs0.battery_fraction - 1.0) < 1e-5
@@ -84,7 +87,7 @@ def test_observation_numpy():
     arr0 = obs0.to_numpy()
     assert isinstance(arr0, np.ndarray)
     assert arr0.dtype == np.float32
-    assert arr0.shape == (72,)
+    assert arr0.shape == (87,)
     assert not np.any(np.isnan(arr0))
     assert not np.any(np.isinf(arr0))
 
@@ -95,10 +98,10 @@ def test_observation_numpy():
     # 3. Batch 2D observation matrix
     matrix = sim.get_all_observations_numpy()
     assert isinstance(matrix, np.ndarray)
-    assert matrix.shape == (10, 72)
+    assert matrix.shape == (10, 87)
     assert matrix.dtype == np.float32
     np.testing.assert_array_almost_equal(matrix[0], arr0)
-    print("  -> Passed: 72-dim Observation vectorization and NumPy (10, 72) matrix verified.")
+    print("  -> Passed: 87-dim Observation vectorization and NumPy (10, 87) matrix verified.")
 
 
 def test_heuristic_stepping():
@@ -114,7 +117,7 @@ def test_heuristic_stepping():
         assert len(step_res.truncated) == 10
 
         obs_mat = step_res.get_observation_matrix()
-        assert obs_mat.shape == (10, 72)
+        assert obs_mat.shape == (10, 87)
 
         rewards_arr = step_res.get_rewards_numpy()
         assert rewards_arr.shape == (10,)

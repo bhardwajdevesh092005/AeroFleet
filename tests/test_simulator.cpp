@@ -50,7 +50,7 @@ void testObservationExtraction() {
 
         std::vector<float> vec = obs.toVector();
         assert(vec.size() == Observation::vectorSize());
-        assert(vec.size() == 72);
+        assert(vec.size() == 87);
 
         for (float val : vec) {
             assert(!std::isnan(val) && !std::isinf(val));
@@ -60,7 +60,7 @@ void testObservationExtraction() {
     auto allObs = sim.getAllObservations();
     assert(allObs.size() == sim.getFleetSize());
 
-    std::cout << "  -> Passed: Observation dimensionality verified (72 floats, 44 lidar, 18 neighbor states).\n";
+    std::cout << "  -> Passed: Observation dimensionality verified (87 floats, 44 lidar, 18 neighbor states, acceleration, heading, and mode).\n";
 }
 
 void testHeuristicStepping() {
@@ -80,7 +80,7 @@ void testHeuristicStepping() {
         for (size_t i = 0; i < sim.getFleetSize(); ++i) {
             assert(!std::isnan(res.rewards[i]));
             assert(!std::isinf(res.rewards[i]));
-            assert(res.observations[i].toVector().size() == 72);
+            assert(res.observations[i].toVector().size() == 87);
         }
     }
 

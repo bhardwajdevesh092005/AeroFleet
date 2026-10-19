@@ -1,5 +1,7 @@
 # Step 13: pybind11 C++ Simulator Bindings
 
+> **Schema update:** The 72-element observation described in this historical Step 13 record was superseded during Step 14. Current bindings expose the 87-element raw observation schema v2; the Gymnasium wrapper applies finite config-derived normalization. See [Step 14](step_14_gymnasium_navigation.md).
+
 ## 1. Objectives & Scope
 Step 13 connects the high-performance C++20 simulation core with the Python data science and Reinforcement Learning ecosystem. It encapsulates procedural world generation, multi-UAV kinematic integration, continuous collision detection (CCD), battery discharge/charging, customer request lifecycle, and spatial raycasting into a unified C++ `Simulator` engine, and exposes it through zero-overhead `pybind11` Python bindings.
 

@@ -2,16 +2,21 @@
 
 ## Status
 
-**Completed.** The single-agent Gymnasium wrapper, native bindings, and focused integration coverage have been built and exercised under Python 3.14.4 with Gymnasium 1.4.0, NumPy 2.5.4, pytest 9.1.1, and pybind11 3.1.0.
+**Stage 1 completed.** The Gymnasium wrapper now starts a deterministic one-UAV, obstacle-free waypoint task by default. The stochastic fleet simulator remains selectable for integration checks. The environment, bindings, and focused tests were exercised with Python 3.14.4, Gymnasium 1.4.0, NumPy 2.5.4, pytest 9.1.1, and pybind11 3.1.0.
+
+**Scope boundary:** Stage 1 establishes a learnable fixed-target task and observation/reward contract. Obstacle/boundary, battery and delivery lifecycle, multi-UAV traffic, and coordinator-training environments remain future curriculum stages.
 
 ## Contract implemented
 
-- The learning policy controls UAV 0; remaining mission-active UAVs use the existing heuristic controller through the simulator's short action-vector fallback.
-- Observation: the C++ simulator's fixed 72-element `float32` vector.
+- The Stage 1 policy controls the only active UAV. In `full_fleet` mode, the wrapper controls UAV 0 and remaining mission-active UAVs use the existing heuristic controller through the simulator's short action-vector fallback.
+- Observation: schema v2, 87 ordered features. Kinematics, target displacement, and nearby-UAV state use the UAV body frame; orientation is encoded as heading sine/cosine.
+- Feature groups: velocity (3), acceleration (3), relative target (3), target distance (1), battery fraction (1), payload fraction (1), speed fraction (1), 44 lidar distances, three neighboring UAV states (18), heading (2), and UAV mode one-hot (10).
+- Python normalizes configuration-dependent values into a finite Box and exposes `observation_schema` (version, feature order, coordinate frame, and scales).
 - Action: `Box(-1, 1, shape=(3,))`, interpreted as normalized desired `(vx, vy, vz)`.
 - X/Y are scaled by configured maximum horizontal speed; Z is scaled by configured maximum vertical speed. The C++ kinematics integrator remains authoritative for acceleration, speed, and altitude bounds.
-- Reward: use the C++ simulator's per-UAV transition reward.
-- Termination: controlled UAV enters `EMERGENCY`. Truncation: configured episode step limit, with terminal state taking precedence if both happen together.
+- Stage 1 reward: `-0.01 + 0.1 * clamp(d_previous - d_current, -dt * (v_horizontal + v_vertical), +dt * (v_horizontal + v_vertical))`; reaching within 2 m adds 10; collision/emergency or battery depletion subtracts 10.
+- Termination: waypoint success, collision/emergency, or battery depletion. Truncation: configured episode step limit, with terminal state taking precedence.
+- Default reset selects `open_waypoint`, starts with an active reachable target, disables request arrivals and fleet dispatch, and runs one UAV. Select `options={"scenario": "full_fleet"}` for the stochastic delivery simulator.
 - Seed: explicit Gymnasium seed is forwarded to the C++ simulator; when omitted, a seed is drawn from Gymnasium's seeded RNG.
 
 ## Files
@@ -29,6 +34,12 @@
 - Debug CTest: **16/16 passed**, including 14 C++ suites, `PythonBindingTests`, and `GymnasiumNavigationTests`.
 - Release CTest: **16/16 passed** with the same coverage.
 - Binding API test script: **8/8 checks passed**, including NumPy conversion, direct action stepping, reproducibility, and throughput.
-- Gymnasium pytest suite: **10/10 passed**, including `check_env` and a randomized 100-episode smoke test.
-- Python syntax compilation and CRLF-aware `git diff --check` passed.
-- `check_env` emits two warnings because the observation Box currently has `-inf`/`+inf` bounds. These are warnings, not checker failures; finite per-feature bounds and reward/observation normalization should be reviewed before PPO training.
+- Gymnasium pytest suite: **13/13 passed**, including the standard checker, deterministic seeded reset, a successful waypoint episode, full-fleet observation bounds, and 100 short random-action smoke episodes.
+- `check_env` passes without the previous infinite-bound warnings.
+
+## Remaining curriculum work
+
+1. Add controlled building/boundary scenarios, then battery and pickup/delivery transitions.
+2. Add multi-UAV traffic and dynamic demand while keeping the learned navigation action isolated from the coordinator policy.
+3. Extend Step 15 with direct binding-versus-wrapper action/observation/reward parity checks and independent expected-trajectory physics checks.
+4. Train and evaluate Stage 1 PPO before advancing the curriculum; random-action smoke episodes are API checks, not policy performance evidence.

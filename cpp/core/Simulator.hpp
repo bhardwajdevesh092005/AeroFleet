@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <array>
 #include "core/Config.hpp"
 #include "core/Types.hpp"
 #include "core/WorldState.hpp"
@@ -27,6 +28,7 @@ namespace aerofleet {
 struct Observation {
     UAVId uavId{0};
     Vec3 egoVelocity{0.0, 0.0, 0.0};
+    Vec3 egoAcceleration{0.0, 0.0, 0.0};
     Vec3 relativeTarget{0.0, 0.0, 0.0};
     double distanceToTarget{0.0};
     double batteryFraction{1.0};
@@ -34,9 +36,12 @@ struct Observation {
     double speed{0.0};
     std::vector<float> lidarBeams; // 44 beams normalized [0.0, 1.0]
     std::vector<float> nearbyUavs; // K nearest UAVs (dx, dy, dz, vx, vy, vz)
+    double headingSin{0.0};
+    double headingCos{1.0};
+    std::array<float, 10> modeOneHot{};
 
     [[nodiscard]] std::vector<float> toVector() const;
-    [[nodiscard]] static constexpr size_t vectorSize() noexcept { return 72; }
+    [[nodiscard]] static constexpr size_t vectorSize() noexcept { return 87; }
 };
 
 /**
@@ -62,6 +67,7 @@ public:
     explicit Simulator(const std::string& configPath = "config/simulation.json");
 
     void reset(uint64_t seed = 0);
+    void resetNavigationTask(uint64_t seed, const Vec3& start, const Vec3& target);
 
     /**
      * @brief Step simulation by 1 policy control interval (dtPolicy) using provided velocity commands.
@@ -100,6 +106,7 @@ public:
     [[nodiscard]] double getSimulatedTime() const noexcept { return m_clock.now(); }
     [[nodiscard]] uint64_t getStepCount() const noexcept { return m_clock.getStepCount(); }
     [[nodiscard]] size_t getFleetSize() const noexcept { return m_fleet.size(); }
+    [[nodiscard]] bool navigationTaskSucceeded() const noexcept { return m_navigationTaskSucceeded; }
 
     void setSeed(uint64_t seed) { m_config.simulation.randomSeed = seed; reset(seed); }
 
@@ -124,11 +131,18 @@ private:
 
     double m_lastCoordinatorDispatchTime{-10.0};
     uint64_t m_currentSeed{42};
+    bool m_navigationTask{false};
+    bool m_navigationTaskSucceeded{false};
+    Vec3 m_navigationTarget{0.0, 0.0, 0.0};
+    double m_navigationArrivalRadius{2.0};
 
     void integratePhysicsSubStep(double dt, const std::vector<VelocityCommand>& actions);
     [[nodiscard]] std::vector<float> computeLidarBeams(const Vec3& position, double yaw, double maxRange = 100.0) const;
     [[nodiscard]] std::vector<float> computeNearbyUavs(UAVId egoId, size_t maxNeighbors = 3) const;
     [[nodiscard]] float computeReward(const UAVState& uav, const UAVState& prevUav, bool reached, bool crashed) const;
+    [[nodiscard]] float computeNavigationReward(
+        const UAVState& uav, const UAVState& prevUav, bool succeeded, bool failed, double dtPolicy
+    ) const;
 };
 
 } // namespace aerofleet

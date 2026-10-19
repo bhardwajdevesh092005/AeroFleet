@@ -3,6 +3,7 @@
 #include <pybind11/numpy.h>
 #include <sstream>
 #include <cstring>
+#include <cmath>
 
 #include "core/Simulator.hpp"
 #include "core/Types.hpp"
@@ -181,6 +182,7 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
     py::class_<Observation>(m, "Observation")
         .def_readonly("uav_id", &Observation::uavId)
         .def_readonly("ego_velocity", &Observation::egoVelocity)
+        .def_readonly("ego_acceleration", &Observation::egoAcceleration)
         .def_readonly("relative_target", &Observation::relativeTarget)
         .def_readonly("distance_to_target", &Observation::distanceToTarget)
         .def_readonly("battery_fraction", &Observation::batteryFraction)
@@ -188,6 +190,9 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
         .def_readonly("speed", &Observation::speed)
         .def_readonly("lidar_beams", &Observation::lidarBeams)
         .def_readonly("nearby_uavs", &Observation::nearbyUavs)
+        .def_readonly("heading_sin", &Observation::headingSin)
+        .def_readonly("heading_cos", &Observation::headingCos)
+        .def_readonly("mode_one_hot", &Observation::modeOneHot)
         .def("to_list", &Observation::toVector)
         .def("to_numpy", [](const Observation& obs) {
             auto vec = obs.toVector();
@@ -261,6 +266,10 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
             py::gil_scoped_release release;
             self.reset(seed);
         }, py::arg("seed") = 0)
+        .def("reset_navigation_task", [](Simulator& self, uint64_t seed, const Vec3& start, const Vec3& target) {
+            py::gil_scoped_release release;
+            self.resetNavigationTask(seed, start, target);
+        }, py::arg("seed"), py::arg("start"), py::arg("target"))
         .def("step", [](Simulator& self, const std::vector<VelocityCommand>& actions) {
             py::gil_scoped_release release;
             return self.step(actions);
@@ -302,6 +311,28 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
         })
         .def_property_readonly("max_vertical_speed", [](const Simulator& self) {
             return self.getConfig().fleet.maxVerticalSpeed;
+        })
+        .def_property_readonly("max_acceleration", [](const Simulator& self) {
+            return self.getConfig().fleet.maxAcceleration;
+        })
+        .def_property_readonly("max_payload_mass", [](const Simulator& self) {
+            return self.getConfig().requests.maxPayloadKg;
+        })
+        .def_property_readonly("world_extent", [](const Simulator& self) {
+            return self.getConfig().world.getDimensions();
+        })
+        .def_property_readonly("world_min", [](const Simulator& self) {
+            const auto& w = self.getConfig().world;
+            return Vec3(w.xMin, w.yMin, w.zMin);
+        })
+        .def_property_readonly("default_spawn_altitude", [](const Simulator& self) {
+            return self.getConfig().world.defaultSpawnAltitude;
+        })
+        .def_property_readonly("navigation_task_succeeded", &Simulator::navigationTaskSucceeded)
+        .def_property_readonly("max_observation_speed", [](const Simulator& self) {
+            const auto& f = self.getConfig().fleet;
+            return std::sqrt(2.0 * f.maxHorizontalSpeed * f.maxHorizontalSpeed +
+                             f.maxVerticalSpeed * f.maxVerticalSpeed);
         });
 }
 
