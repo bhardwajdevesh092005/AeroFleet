@@ -18,7 +18,10 @@
 #include "physics/Kinematics.hpp"
 #include "visualization/Renderer.hpp"
 #include "visualization/CameraController.hpp"
+#include "telemetry/Metrics.hpp"
+#include "telemetry/Logger.hpp"
 #include <fstream>
+#include <filesystem>
 
 using namespace aerofleet;
 
@@ -43,11 +46,14 @@ std::string resolveConfigPath(const std::string& path) {
 
 int main(int argc, char* argv[]) {
     std::string configPath = "config/simulation.json";
+    std::string outputDir = "logs";
     bool headless = false;
     uint64_t maxSteps = 0; // 0 = unlimited
     double timeScale = 1.0;
     uint64_t seedOverride = 0;
     bool hasSeedOverride = false;
+    bool logEvents = false;
+    bool exportMetrics = true;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -62,6 +68,12 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--seed" && i + 1 < argc) {
             seedOverride = std::stoull(argv[++i]);
             hasSeedOverride = true;
+        } else if (arg == "--output" && i + 1 < argc) {
+            outputDir = argv[++i];
+        } else if (arg == "--log-events") {
+            logEvents = true;
+        } else if (arg == "--no-metrics") {
+            exportMetrics = false;
         }
     }
 
@@ -116,6 +128,9 @@ int main(int argc, char* argv[]) {
 
     double lastCoordinatorDispatchTime = -10.0;
     size_t totalCreated = 0;
+
+    MetricsTracker metrics;
+    EventLogger logger(131072); // High-speed 128k event ring buffer
 
     // 3. Initialize visualizer (unless headless requested)
     RendererConfig rendererConfig;
@@ -184,6 +199,13 @@ int main(int argc, char* argv[]) {
             auto newRequests = requestGen.step(currentTime, dt);
             if (!newRequests.empty()) {
                 totalCreated += newRequests.size();
+                for (const auto& req : newRequests) {
+                    metrics.recordRequestCreated(req);
+                    if (logEvents) {
+                        logger.log(currentTime, SimulationEventType::REQUEST_CREATED,
+                                   req.id, req.storeId, req.payloadMass);
+                    }
+                }
                 pendingRequests.insert(pendingRequests.end(), newRequests.begin(), newRequests.end());
             }
 
@@ -194,13 +216,28 @@ int main(int argc, char* argv[]) {
             }
 
             // 3. Step fleet lifecycle (dwell times, state changes, charging)
+            const size_t prevDeliveredCount = deliveredRequests.size();
             fleet.step(dt, currentTime, map, deliveredRequests, requeuedRequests);
+            for (size_t d = prevDeliveredCount; d < deliveredRequests.size(); ++d) {
+                metrics.recordRequestDelivered(deliveredRequests[d], currentTime);
+                if (logEvents) {
+                    logger.log(currentTime, SimulationEventType::REQUEST_DELIVERED,
+                               deliveredRequests[d].id, deliveredRequests[d].assignedUavId,
+                               deliveredRequests[d].deliveryTime - deliveredRequests[d].creationTime);
+                }
+            }
             if (!requeuedRequests.empty()) {
+                for (const auto& req : requeuedRequests) {
+                    if (logEvents) {
+                        logger.log(currentTime, SimulationEventType::REQUEST_REQUEUED, req.id, req.assignedUavId);
+                    }
+                }
                 pendingRequests.insert(pendingRequests.end(), requeuedRequests.begin(), requeuedRequests.end());
                 requeuedRequests.clear();
             }
 
             // 4. Compute navigation actions and integrate rigid kinematics
+            double totalPowerWatts = 0.0;
             for (auto& uav : fleet.getAllUAVs()) {
                 VelocityCommand action;
                 if (uav.mode == UAVMode::FLYING_TO_PICKUP ||
@@ -210,11 +247,22 @@ int main(int argc, char* argv[]) {
                 }
                 integrator.stepVelocityCommand(uav, action, dt);
                 fleet.getBatteryModel().stepDischarge(uav, dt);
+                totalPowerWatts += fleet.getBatteryModel().computePowerWatts(uav.velocity, uav.payloadMass);
             }
+            metrics.recordStep(fleet.getAllUAVs(), dt, totalPowerWatts, currentTime);
 
             // 5. Continuous collision detection and deterministic rollback
             auto newCollisions = collisions.evaluateAndResolve(fleet.getAllUAVs(), prevPositions, map, currentTime);
             if (!newCollisions.empty()) {
+                for (const auto& c : newCollisions) {
+                    metrics.recordCollision(c);
+                    if (logEvents) {
+                        logger.log(currentTime,
+                                   c.type == CollisionType::BUILDING ? SimulationEventType::COLLISION_BUILDING : SimulationEventType::COLLISION_UAV,
+                                   c.uavIdA,
+                                   c.type == CollisionType::BUILDING ? c.buildingId : c.uavIdB);
+                    }
+                }
                 allCollisionEvents.insert(allCollisionEvents.end(), newCollisions.begin(), newCollisions.end());
             }
 
@@ -243,6 +291,8 @@ int main(int argc, char* argv[]) {
                                            fleet.countInMode(UAVMode::FLYING_TO_DESTINATION) +
                                            fleet.countInMode(UAVMode::DROPPING_OFF);
         currSnapshot.metrics.collisionCount = allCollisionEvents.size();
+        currSnapshot.metrics.deliverySuccessRate = metrics.getDeadlineSuccessRate();
+        currSnapshot.metrics.averageDeliveryDuration = metrics.getMeanLatency();
 
         // Render frame with sub-step interpolation
         if (visualMode) {
@@ -253,20 +303,31 @@ int main(int argc, char* argv[]) {
 
     auto totalElapsedWall = std::chrono::duration<double>(std::chrono::steady_clock::now() - wallClockStart).count();
 
-    std::cout << "\n========================================\n";
-    std::cout << "         Simulation Summary             \n";
-    std::cout << "========================================\n";
-    std::cout << "[Report] Simulated Time: " << clock.now() << "s\n";
-    std::cout << "[Report] Real Wall Time: " << totalElapsedWall << "s\n";
-    std::cout << "[Report] Total Steps:    " << clock.getStepCount() << "\n";
-    if (totalElapsedWall > 0.0) {
-        std::cout << "[Report] Speed Multiplier: " << (clock.now() / totalElapsedWall) << "x real-time\n";
+    metrics.finalize(totalElapsedWall);
+    metrics.printSummary(std::cout);
+
+    if (exportMetrics && !outputDir.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(outputDir, ec);
+        std::string jsonPath = outputDir + "/metrics.json";
+        std::string csvPath = outputDir + "/metrics.csv";
+        if (metrics.saveToJsonFile(jsonPath)) {
+            std::cout << "[System] Performance metrics saved: " << jsonPath << "\n";
+        }
+        if (metrics.saveToCsvFile(csvPath)) {
+            std::cout << "[System] Performance metrics saved: " << csvPath << "\n";
+        }
     }
-    std::cout << "[Report] Requests Created:   " << totalCreated << "\n";
-    std::cout << "[Report] Requests Delivered: " << deliveredRequests.size() << "\n";
-    std::cout << "[Report] Requests Pending:   " << pendingRequests.size() << "\n";
-    std::cout << "[Report] Collision Incidents:" << allCollisionEvents.size() << "\n";
-    std::cout << "========================================\n";
+
+    if (logEvents && !outputDir.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(outputDir, ec);
+        std::string eventsPath = outputDir + "/simulation_events.jsonl";
+        if (logger.flushToFile(eventsPath)) {
+            std::cout << "[System] Telemetry events logged: " << eventsPath
+                      << " (" << logger.totalLogged() << " events)\n";
+        }
+    }
 
     renderer.close();
     return 0;

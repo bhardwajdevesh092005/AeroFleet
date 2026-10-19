@@ -12,10 +12,10 @@ The repository also has focused suites for configuration, math/geometry, world g
 ## Verification
 
 - Clean CMake build completed successfully (including raylib 5.5 and `AeroFleet` executable).
-- CTest: **12/12 suites passed** (100% pass rate).
+- CTest: **13/13 suites passed** (100% pass rate).
 - `git diff --check`: clean.
-- The CTest suites contain 76 individual named cases in total across configuration, math/geometry, world generation, kinematics, collision detection, battery/charging, request generation, fleet lifecycle, heuristic navigation, heuristic coordinator, cross-module integration, and 3D visualization / clock decoupling.
+- The CTest suites contain 82 individual named cases in total across configuration, math/geometry, world generation, kinematics, collision detection, battery/charging, request generation, fleet lifecycle, heuristic navigation, heuristic coordinator, cross-module integration, 3D visualization / clock decoupling, and reproducibility / telemetry benchmarking.
 
 ## Coverage Boundary
 
-The simulation now features an authoritative fixed-step clock (`SimulationClock`), immutable state snapshots (`WorldState`), multi-mode 3D camera controller (`CameraController`), and 3D raylib renderer with HUD (`Renderer`), along with complete cross-module execution in `cpp/main.cpp`. The next phases will introduce high-speed structured telemetry logging (Step 12), pybind11 Python bindings (Step 13), and the Gymnasium RL navigation environment (Step 14).
+Phase IV (Visualization & Telemetry) is now complete: the simulation features an authoritative fixed-step clock (`SimulationClock`), immutable state snapshots (`WorldState`), multi-mode 3D camera controller (`CameraController`), 3D raylib renderer with HUD (`Renderer`), high-speed in-memory ring-buffer event logger (`EventLogger`), and fleet KPI metrics engine (`MetricsTracker`). The next phase is Phase V: Python Gymnasium RL Environment, starting with pybind11 C++ Simulator Bindings (Step 13).

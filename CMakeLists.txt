@@ -74,6 +74,7 @@ add_library(AeroFleetCore STATIC
     cpp/coordinator/HeuristicCoordinator.cpp
     cpp/visualization/CameraController.cpp
     cpp/visualization/Renderer.cpp
+    cpp/telemetry/Metrics.cpp
 )
 
 target_include_directories(AeroFleetCore PUBLIC
@@ -196,4 +197,13 @@ add_executable(test_visualization
 target_link_libraries(test_visualization PRIVATE AeroFleetCore raylib)
 add_test(NAME VisualizationTests COMMAND test_visualization)
 set_tests_properties(VisualizationTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
+# Unit and integration tests: High-Speed Simulation Runner, Telemetry, Seed Reproducibility & Benchmarking
+add_executable(test_reproducibility
+    tests/test_reproducibility.cpp
+)
+target_link_libraries(test_reproducibility PRIVATE AeroFleetCore)
+add_test(NAME ReproducibilityTests COMMAND test_reproducibility)
+set_tests_properties(ReproducibilityTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+
 

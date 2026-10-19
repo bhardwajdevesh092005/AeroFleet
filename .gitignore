@@ -70,3 +70,4 @@ Testing/
 
 __pycache__/
 .vscode/
+logs/
