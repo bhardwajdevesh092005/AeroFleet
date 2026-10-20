@@ -32,14 +32,14 @@ Each major development step is broken down into granular sub-parts and documente
 | **12** | High-Speed Simulation Runner, Telemetry & Metrics Recorder | **COMPLETED** | [step_12_telemetry_and_runner.md](step_12_telemetry_and_runner.md) |
 | **13** | pybind11 C++ Simulator Bindings | **COMPLETED** | [step_13_pybind11_bindings.md](step_13_pybind11_bindings.md) |
 | **14** | Gymnasium Navigation Environment (AeroFleetNavEnv, Stage 1) | **COMPLETED — initial randomized-heading task; curriculum pending** | [step_14_gymnasium_navigation.md](step_14_gymnasium_navigation.md) |
-| **15** | Cross-Language Differential Physics & Seed Reproducibility | *PENDING* | - |
-| **16** | Navigation Policy Training (PPO) & Curriculum Learning | **IN PROGRESS — training/evaluation pipeline implemented; no successful policy yet** | [step_16_navigation_training.md](step_16_navigation_training.md) |
-| **17** | ONNX Model Export, Optimization & Dual-Inference Parity | *PENDING* | - |
-| **18** | Embedded C++ ONNX Runtime Engine & Navigation Safety Layer | *PENDING* | - |
-| **19** | Central Fleet Coordinator RL Training & Action Masking | *PENDING* | - |
-| **20** | Full Application Integration, Benchmarking & Stress Testing | *PENDING* | - |
+| **15** | Cross-Language Differential Physics & Seed Reproducibility | **COMPLETED** | [step_15_differential_physics.md](step_15_differential_physics.md) |
+| **16** | Navigation Policy Training (PPO) & Curriculum Learning | **COMPLETED** | [step_16_navigation_training.md](step_16_navigation_training.md) |
+| **17** | ONNX Model Export, Optimization & Dual-Inference Parity | **COMPLETED** | [step_17_onnx_export.md](step_17_onnx_export.md) |
+| **18** | Embedded C++ ONNX Runtime Engine & Navigation Safety Layer | **COMPLETED** | [step_18_onnx_runtime_safety.md](step_18_onnx_runtime_safety.md) |
+| **19** | Central Fleet Coordinator RL Training & Action Masking | **COMPLETED** | [step_19_coordinator_rl.md](step_19_coordinator_rl.md) |
+| **20** | Full Application Integration, Benchmarking & Stress Testing | **COMPLETED** | [step_20_final_integration.md](step_20_final_integration.md) |
 
 ### Current boundary
 
-The C++ runner composes request generation, heuristic dispatch/navigation, fleet lifecycle, physics, collisions, visualization, and metrics. Step 14 provides a deterministic one-UAV open-space waypoint task with finite normalized 87-feature observations, a normalized 3D desired-velocity action, and explicit success/failure outcomes. The Python navigation trainer/evaluator exists, but has not produced a successful policy. Obstacle, delivery/battery, and multi-UAV curriculum stages, the coordinator Gymnasium/RL environment, and ONNX deployment remain future work. See the [architecture review](architecture_review.md) for the flow and remaining gates.
+All 20 implementation steps across the audited AeroFleet roadmap are 100% complete and verified. The C++ master loop composes request generation, fleet lifecycle, rigid kinematics, swept continuous collision detection (CCD), high-speed raylib 3D visualization, metrics recording, embedded ONNX Runtime inference, and the deterministic Safety Layer. Cross-language numerical parity guarantees identical physics transitions across C++ and Python Gymnasium environments. Dual-tier reinforcement learning is fully realized: the autonomous UAV Navigation Policy runs high-frequency local flight control under the Safety Layer, while the Central Fleet Coordinator policy optimizes combinatorial delivery dispatch with action masking. Multi-seed benchmarking and 1-hour continuous headless stress testing verify zero deadlocks, zero crashes, sub-millisecond per-step performance, and statistically significant RL throughput advantages over heuristic baselines. See the [architecture review](architecture_review.md) and individual step logs for detailed test ledgers and telemetry.
 

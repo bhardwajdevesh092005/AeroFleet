@@ -21,8 +21,11 @@
 #include "visualization/CameraController.hpp"
 #include "telemetry/Metrics.hpp"
 #include "telemetry/Logger.hpp"
+#include "control/ONNXNavigationPolicy.hpp"
+#include "control/SafetyLayer.hpp"
 #include <fstream>
 #include <filesystem>
+#include <memory>
 
 using namespace aerofleet;
 
@@ -43,12 +46,35 @@ std::string resolveConfigPath(const std::string& path) {
     return path;
 }
 
+void printHelp(const char* prog) {
+    std::cout << "========================================\n"
+              << "      AeroFleet Simulation Engine       \n"
+              << "========================================\n"
+              << "Usage: " << prog << " [options]\n\n"
+              << "Options:\n"
+              << "  --config <path>       Path to simulation JSON config (default: config/simulation.json)\n"
+              << "  --headless            Run in headless mode without raylib GUI window\n"
+              << "  --benchmark           Run high-speed benchmark and print detailed performance metrics\n"
+              << "  --steps <N>           Run for N fixed physics steps then exit (0 = unlimited)\n"
+              << "  --speed <factor>      Time scale factor in visual mode (e.g. 1.0 = real-time, 5.0 = 5x)\n"
+              << "  --seed <S>            Override PRNG seed\n"
+              << "  --output <dir>        Directory to output metrics and logs (default: logs)\n"
+              << "  --onnx-nav            Enable embedded ONNX deep RL navigation policy\n"
+              << "  --nav-policy <path>   Path to ONNX navigation model (default: models/navigation/nav_policy.onnx)\n"
+              << "  --norm-path <path>    Path to normalization stats (default: models/navigation/normalization.json)\n"
+              << "  --no-safety           Disable deterministic Safety Layer obstacle filter\n"
+              << "  --log-events          Enable event ring-buffer logging to simulation_events.jsonl\n"
+              << "  --no-metrics          Disable saving metrics to JSON/CSV\n"
+              << "  --help, -h            Show this help message and exit\n\n";
+}
+
 } // namespace
 
 int main(int argc, char* argv[]) {
     std::string configPath = "config/simulation.json";
     std::string outputDir = "logs";
     bool headless = false;
+    bool benchmark = false;
     uint64_t maxSteps = 0; // 0 = unlimited
     double timeScale = 1.0;
     uint64_t seedOverride = 0;
@@ -56,12 +82,22 @@ int main(int argc, char* argv[]) {
     bool logEvents = false;
     bool exportMetrics = true;
 
+    bool useOnnxNav = false;
+    std::string navPolicyPath = "models/navigation/nav_policy.onnx";
+    std::string normPath = "models/navigation/normalization.json";
+    bool useSafety = true;
+
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
-        if (arg == "--config" && i + 1 < argc) {
+        if (arg == "--help" || arg == "-h") {
+            printHelp(argv[0]);
+            return 0;
+        } else if (arg == "--config" && i + 1 < argc) {
             configPath = argv[++i];
         } else if (arg == "--headless") {
             headless = true;
+        } else if (arg == "--benchmark") {
+            benchmark = true;
         } else if (arg == "--steps" && i + 1 < argc) {
             maxSteps = std::stoull(argv[++i]);
         } else if (arg == "--speed" && i + 1 < argc) {
@@ -71,6 +107,15 @@ int main(int argc, char* argv[]) {
             hasSeedOverride = true;
         } else if (arg == "--output" && i + 1 < argc) {
             outputDir = argv[++i];
+        } else if (arg == "--onnx-nav") {
+            useOnnxNav = true;
+        } else if (arg == "--nav-policy" && i + 1 < argc) {
+            navPolicyPath = argv[++i];
+            useOnnxNav = true;
+        } else if (arg == "--norm-path" && i + 1 < argc) {
+            normPath = argv[++i];
+        } else if (arg == "--no-safety") {
+            useSafety = false;
         } else if (arg == "--log-events") {
             logEvents = true;
         } else if (arg == "--no-metrics") {
@@ -118,6 +163,28 @@ int main(int argc, char* argv[]) {
     navConfig.maxHorizontalSpeed = config.fleet.maxHorizontalSpeed;
     navConfig.maxVerticalSpeed = config.fleet.maxVerticalSpeed;
     WaypointController navigator(navConfig);
+
+    std::shared_ptr<ONNXNavigationPolicy> navPolicy;
+    if (useOnnxNav) {
+        std::string resolvedModel = resolveConfigPath(navPolicyPath);
+        std::string resolvedNorm = resolveConfigPath(normPath);
+        SafetyLayerConfig safetyCfg;
+        if (!useSafety) {
+            safetyCfg.safetyMargin = 0.0;
+            safetyCfg.lookaheadTime = 0.0;
+        }
+        try {
+            navPolicy = std::make_shared<ONNXNavigationPolicy>(resolvedModel, resolvedNorm, safetyCfg);
+            std::cout << "[System] Navigation Engine: Trained ONNX Actor (" << resolvedModel << ")\n";
+            std::cout << "[System] Safety Layer: " << (useSafety ? "ENABLED" : "DISABLED") << "\n";
+        } catch (const std::exception& ex) {
+            std::cerr << "[Warning] Failed to initialize ONNX Navigation Policy: " << ex.what() << "\n";
+            std::cerr << "          Falling back to Heuristic APF Navigation.\n";
+            navPolicy = nullptr;
+        }
+    } else {
+        std::cout << "[System] Navigation Engine: Baseline Heuristic APF\n";
+    }
 
     HeuristicCoordinator coordinator;
     CollisionSystem collisions(config.fleet.uavRadius);
@@ -271,7 +338,12 @@ int main(int argc, char* argv[]) {
                 if (uav.mode == UAVMode::FLYING_TO_PICKUP ||
                     uav.mode == UAVMode::FLYING_TO_DESTINATION ||
                     uav.mode == UAVMode::RETURNING_TO_CHARGE) {
-                    action = navigator.computeActionWithTraffic(uav, map, trafficSnapshot, dt);
+                    if (navPolicy) {
+                        action = navPolicy->computeAction(uav, map, dt);
+                        action = navigator.applyTrafficAvoidance(uav, action, trafficSnapshot);
+                    } else {
+                        action = navigator.computeActionWithTraffic(uav, map, trafficSnapshot, dt);
+                    }
                 }
                 integrator.stepVelocityCommand(uav, action, dt);
                 fleet.getBatteryModel().stepDischarge(uav, dt);
@@ -342,6 +414,21 @@ int main(int argc, char* argv[]) {
 
         // Render frame with sub-step interpolation
         if (visualMode) {
+            camera.handleInput(elapsed.count());
+            camera.update(elapsed.count(), currSnapshot);
+            if (IsKeyPressed(KEY_TAB)) {
+                renderer.cycleSelectedUav(fleet.size());
+                camera.setChaseTarget(renderer.getSelectedUav());
+            }
+            if (IsKeyPressed(KEY_C)) {
+                camera.cycleMode();
+            }
+            if (IsKeyPressed(KEY_H)) {
+                renderer.toggleHUD();
+            }
+            if (IsKeyPressed(KEY_T)) {
+                renderer.toggleTrajectories();
+            }
             WorldSnapshot renderSnapshot = WorldSnapshot::interpolate(prevSnapshot, currSnapshot, clock.getAlpha());
             renderer.draw(renderSnapshot, map, camera);
         }
@@ -351,6 +438,30 @@ int main(int argc, char* argv[]) {
 
     metrics.finalize(totalElapsedWall);
     metrics.printSummary(std::cout);
+
+    if (benchmark) {
+        double stepsPerSec = totalElapsedWall > 0.0 ? (static_cast<double>(clock.getStepCount()) / totalElapsedWall) : 0.0;
+        double realTimeMult = totalElapsedWall > 0.0 ? (clock.now() / totalElapsedWall) : 0.0;
+        std::cout << "\n========================================\n";
+        std::cout << "       AeroFleet Benchmark Report        \n";
+        std::cout << "========================================\n";
+        std::cout << "  Execution Mode:        " << (headless ? "Headless" : "Graphical") << "\n";
+        std::cout << "  Navigation Engine:     " << (navPolicy ? "Trained ONNX Actor + Safety Layer" : "Baseline Heuristic APF") << "\n";
+        std::cout << "  Safety Layer:          " << (useSafety ? "Enabled" : "Disabled") << "\n";
+        std::cout << "  Total Steps Executed:  " << clock.getStepCount() << "\n";
+        std::cout << "  Simulation Duration:   " << std::fixed << std::setprecision(2) << clock.now() << " s ("
+                  << (clock.now() / 3600.0) << " sim-hours)\n";
+        std::cout << "  Wall Execution Time:   " << std::setprecision(4) << totalElapsedWall << " s\n";
+        std::cout << "  Step Throughput:       " << std::setprecision(2) << stepsPerSec << " steps/s\n";
+        std::cout << "  Real-Time Multiplier:  " << std::setprecision(2) << realTimeMult << "x real-time\n";
+        std::cout << "  Total Requests:        Created=" << totalCreated
+                  << ", Delivered=" << deliveredRequests.size()
+                  << ", Expired=" << metrics.getExpiredCount() << "\n";
+        std::cout << "  On-Time Success Rate:  " << std::setprecision(2) << metrics.getDeadlineSuccessRate() << "%\n";
+        std::cout << "  Mean Latency:          " << std::setprecision(2) << metrics.getMeanLatency() << " s\n";
+        std::cout << "  Total Collisions:      " << allCollisionEvents.size() << " (0 allowed)\n";
+        std::cout << "========================================\n\n";
+    }
 
     if (exportMetrics && !outputDir.empty()) {
         std::error_code ec;

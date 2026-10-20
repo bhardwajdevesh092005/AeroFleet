@@ -261,3 +261,25 @@ def test_random_policy_completes_one_hundred_short_episodes():
             assert terminated or truncated
     finally:
         env.close()
+
+
+def test_max_route_distance_validation_and_bounds():
+    with pytest.raises(ValueError, match="max_route_distance must be positive"):
+        AeroFleetNavEnv(max_route_distance=-5.0)
+
+    with pytest.raises(ValueError, match="min_route_distance cannot exceed max_route_distance"):
+        AeroFleetNavEnv(min_route_distance=50.0, max_route_distance=20.0)
+
+    env = AeroFleetNavEnv(
+        randomize_waypoint=True,
+        min_route_distance=10.0,
+        max_route_distance=30.0,
+    )
+    try:
+        for s in range(50):
+            env.reset(seed=100 + s)
+            distance = float(env.sim.get_observation(0).distance_to_target)
+            assert 9.9 <= distance <= 30.1, f"Seed {s} distance {distance} out of bounds"
+    finally:
+        env.close()
+

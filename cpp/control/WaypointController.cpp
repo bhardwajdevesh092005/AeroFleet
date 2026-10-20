@@ -148,18 +148,17 @@ VelocityCommand WaypointController::computeAction(
     return command;
 }
 
-VelocityCommand WaypointController::computeActionWithTraffic(
+VelocityCommand WaypointController::applyTrafficAvoidance(
     const UAVState& uav,
-    const CityMap& map,
-    const std::vector<UAVState>& traffic,
-    double dt
+    const VelocityCommand& baseCommand,
+    const std::vector<UAVState>& traffic
 ) const {
-    VelocityCommand command = computeAction(uav, map, dt);
-    if (dt <= 0.0) return command;
+    VelocityCommand command = baseCommand;
 
     Vec3 avoidance{};
     for (const auto& other : traffic) {
-        if (other.id == uav.id || other.mode == UAVMode::EMERGENCY || other.mode == UAVMode::OFFLINE) continue;
+        if (other.id == uav.id || other.mode == UAVMode::EMERGENCY || other.mode == UAVMode::OFFLINE ||
+            other.isGrounded || other.position.z <= 0.1) continue;
 
         const Vec3 relativePosition = other.position - uav.position;
         const Vec3 relativeVelocity = other.velocity - command.desiredVelocity;
@@ -197,7 +196,23 @@ VelocityCommand WaypointController::computeActionWithTraffic(
         -m_config.maxVerticalSpeed,
         m_config.maxVerticalSpeed
     );
+
+    if (uav.position.z < 10.0 && command.desiredVelocity.z > 0.0) {
+        command.desiredVelocity.x = 0.0;
+        command.desiredVelocity.y = 0.0;
+    }
     return command;
+}
+
+VelocityCommand WaypointController::computeActionWithTraffic(
+    const UAVState& uav,
+    const CityMap& map,
+    const std::vector<UAVState>& traffic,
+    double dt
+) const {
+    VelocityCommand command = computeAction(uav, map, dt);
+    if (dt <= 0.0) return command;
+    return applyTrafficAvoidance(uav, command, traffic);
 }
 
 } // namespace aerofleet

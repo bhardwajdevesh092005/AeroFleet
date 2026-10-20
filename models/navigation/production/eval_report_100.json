@@ -1,0 +1,1021 @@
+{
+  "model": "/mnt/c/Users/Prateek/Desktop/Coding/project/AeroFleet/models/navigation/production/best/best_model.zip",
+  "training_manifest": "/mnt/c/Users/Prateek/Desktop/Coding/project/AeroFleet/models/navigation/production/training_config.json",
+  "scenario": "open_waypoint_seeded_random_routes",
+  "action_frame": "body",
+  "observation_schema_version": 3,
+  "seed_start": 50000,
+  "seed_end": 50099,
+  "episodes": 100,
+  "mean_return": 50.19382421572693,
+  "std_return": 11.061539930749165,
+  "success_rate": 1.0,
+  "mean_episode_steps": 609.59,
+  "collision_episode_rate": 0.0,
+  "mean_collision_events": 0.0,
+  "mean_battery_fraction_used": 0.03672537863254547,
+  "mean_final_distance_m": 1.8860046932412091,
+  "median_final_distance_m": 1.9014290845886652,
+  "per_episode": [
+    {
+      "episode": 0,
+      "seed": 50000,
+      "return": 68.03476542700082,
+      "steps": 969,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.05492442846298218,
+      "final_distance_m": 1.8244725881307804
+    },
+    {
+      "episode": 1,
+      "seed": 50001,
+      "return": 67.93912023445591,
+      "steps": 778,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.048365116119384766,
+      "final_distance_m": 1.9910427791854295
+    },
+    {
+      "episode": 2,
+      "seed": 50002,
+      "return": 33.4110409184359,
+      "steps": 295,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.01956421136856079,
+      "final_distance_m": 1.8139807441986269
+    },
+    {
+      "episode": 3,
+      "seed": 50003,
+      "return": 55.4483565161936,
+      "steps": 798,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04311490058898926,
+      "final_distance_m": 1.7084808595086383
+    },
+    {
+      "episode": 4,
+      "seed": 50004,
+      "return": 80.7981026363559,
+      "steps": 944,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.059232234954833984,
+      "final_distance_m": 1.9674664277476595
+    },
+    {
+      "episode": 5,
+      "seed": 50005,
+      "return": 57.903153678402305,
+      "steps": 626,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04095333814620972,
+      "final_distance_m": 1.8988411394642342
+    },
+    {
+      "episode": 6,
+      "seed": 50006,
+      "return": 57.791540482547134,
+      "steps": 682,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.044232726097106934,
+      "final_distance_m": 1.7968045963638548
+    },
+    {
+      "episode": 7,
+      "seed": 50007,
+      "return": 65.27280228585005,
+      "steps": 719,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04605555534362793,
+      "final_distance_m": 1.830703755366696
+    },
+    {
+      "episode": 8,
+      "seed": 50008,
+      "return": 51.80960157001391,
+      "steps": 736,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.039324939250946045,
+      "final_distance_m": 1.7530943745664131
+    },
+    {
+      "episode": 9,
+      "seed": 50009,
+      "return": 51.04806797159836,
+      "steps": 545,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.037670791149139404,
+      "final_distance_m": 1.95147154776708
+    },
+    {
+      "episode": 10,
+      "seed": 50010,
+      "return": 41.604204543400556,
+      "steps": 387,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.028949081897735596,
+      "final_distance_m": 1.9827439379157343
+    },
+    {
+      "episode": 11,
+      "seed": 50011,
+      "return": 63.54048943379894,
+      "steps": 780,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04888486862182617,
+      "final_distance_m": 1.9852601129469922
+    },
+    {
+      "episode": 12,
+      "seed": 50012,
+      "return": 52.13709117192775,
+      "steps": 627,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03970134258270264,
+      "final_distance_m": 1.9774412290016565
+    },
+    {
+      "episode": 13,
+      "seed": 50013,
+      "return": 56.41006641974673,
+      "steps": 814,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.043306708335876465,
+      "final_distance_m": 1.8438175669241967
+    },
+    {
+      "episode": 14,
+      "seed": 50014,
+      "return": 56.84935720870271,
+      "steps": 640,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04025447368621826,
+      "final_distance_m": 1.7613983481841784
+    },
+    {
+      "episode": 15,
+      "seed": 50015,
+      "return": 52.67824527435005,
+      "steps": 534,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03767675161361694,
+      "final_distance_m": 1.911753961648926
+    },
+    {
+      "episode": 16,
+      "seed": 50016,
+      "return": 47.70813422091305,
+      "steps": 659,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03609412908554077,
+      "final_distance_m": 1.8813570507452575
+    },
+    {
+      "episode": 17,
+      "seed": 50017,
+      "return": 65.00866264011711,
+      "steps": 817,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04996371269226074,
+      "final_distance_m": 1.9329386388860414
+    },
+    {
+      "episode": 18,
+      "seed": 50018,
+      "return": 53.96432102518156,
+      "steps": 592,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.0398828387260437,
+      "final_distance_m": 1.9556123593019392
+    },
+    {
+      "episode": 19,
+      "seed": 50019,
+      "return": 55.1597826522775,
+      "steps": 776,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04372739791870117,
+      "final_distance_m": 1.8555881933238745
+    },
+    {
+      "episode": 20,
+      "seed": 50020,
+      "return": 44.02542403945699,
+      "steps": 562,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.033770978450775146,
+      "final_distance_m": 1.903535085673355
+    },
+    {
+      "episode": 21,
+      "seed": 50021,
+      "return": 54.103200963232666,
+      "steps": 728,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.039717257022857666,
+      "final_distance_m": 1.7199504985279486
+    },
+    {
+      "episode": 22,
+      "seed": 50022,
+      "return": 34.04462270392105,
+      "steps": 379,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.022413194179534912,
+      "final_distance_m": 1.861164572281818
+    },
+    {
+      "episode": 23,
+      "seed": 50023,
+      "return": 59.71077038301155,
+      "steps": 869,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04708653688430786,
+      "final_distance_m": 1.9967613738527985
+    },
+    {
+      "episode": 24,
+      "seed": 50024,
+      "return": 43.790646796580404,
+      "steps": 592,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.032550036907196045,
+      "final_distance_m": 1.8291425281957026
+    },
+    {
+      "episode": 25,
+      "seed": 50025,
+      "return": 49.497877126559615,
+      "steps": 556,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03697603940963745,
+      "final_distance_m": 1.9233451214257664
+    },
+    {
+      "episode": 26,
+      "seed": 50026,
+      "return": 61.90171413542703,
+      "steps": 784,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04476898908615112,
+      "final_distance_m": 1.730927763251762
+    },
+    {
+      "episode": 27,
+      "seed": 50027,
+      "return": 50.872953358106315,
+      "steps": 526,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.036550700664520264,
+      "final_distance_m": 1.9552963059965918
+    },
+    {
+      "episode": 28,
+      "seed": 50028,
+      "return": 50.1455218847841,
+      "steps": 541,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.037647902965545654,
+      "final_distance_m": 1.9699398883982049
+    },
+    {
+      "episode": 29,
+      "seed": 50029,
+      "return": 39.43994114827365,
+      "steps": 325,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.02615046501159668,
+      "final_distance_m": 1.6245466047302568
+    },
+    {
+      "episode": 30,
+      "seed": 50030,
+      "return": 52.75156717188656,
+      "steps": 708,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03858691453933716,
+      "final_distance_m": 1.914971281650402
+    },
+    {
+      "episode": 31,
+      "seed": 50031,
+      "return": 50.9116592919454,
+      "steps": 633,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03679078817367554,
+      "final_distance_m": 1.9533256498972984
+    },
+    {
+      "episode": 32,
+      "seed": 50032,
+      "return": 60.55680237850174,
+      "steps": 661,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.043245911598205566,
+      "final_distance_m": 1.8810507654572046
+    },
+    {
+      "episode": 33,
+      "seed": 50033,
+      "return": 33.16128400526941,
+      "steps": 275,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.021023333072662354,
+      "final_distance_m": 1.7635393651274751
+    },
+    {
+      "episode": 34,
+      "seed": 50034,
+      "return": 33.010846375487745,
+      "steps": 292,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.021291673183441162,
+      "final_distance_m": 1.898034036340311
+    },
+    {
+      "episode": 35,
+      "seed": 50035,
+      "return": 34.143172934651375,
+      "steps": 458,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.022747516632080078,
+      "final_distance_m": 1.9919632906457396
+    },
+    {
+      "episode": 36,
+      "seed": 50036,
+      "return": 56.55083379941061,
+      "steps": 757,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04178828001022339,
+      "final_distance_m": 1.9275559646778397
+    },
+    {
+      "episode": 37,
+      "seed": 50037,
+      "return": 38.409056291915476,
+      "steps": 455,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.025336086750030518,
+      "final_distance_m": 1.8720100515519609
+    },
+    {
+      "episode": 38,
+      "seed": 50038,
+      "return": 52.19030876411125,
+      "steps": 734,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03904086351394653,
+      "final_distance_m": 1.9998859804697828
+    },
+    {
+      "episode": 39,
+      "seed": 50039,
+      "return": 46.23148727370426,
+      "steps": 500,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03214007616043091,
+      "final_distance_m": 1.7673490574320068
+    },
+    {
+      "episode": 40,
+      "seed": 50040,
+      "return": 44.121115422807634,
+      "steps": 421,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.0314251184463501,
+      "final_distance_m": 1.9019866065927291
+    },
+    {
+      "episode": 41,
+      "seed": 50041,
+      "return": 40.56332636345178,
+      "steps": 360,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.027642011642456055,
+      "final_distance_m": 1.8377325888284706
+    },
+    {
+      "episode": 42,
+      "seed": 50042,
+      "return": 60.329328855499625,
+      "steps": 767,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.047473013401031494,
+      "final_distance_m": 1.9008715625846015
+    },
+    {
+      "episode": 43,
+      "seed": 50043,
+      "return": 58.99771939590573,
+      "steps": 707,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04472029209136963,
+      "final_distance_m": 1.9454304429693723
+    },
+    {
+      "episode": 44,
+      "seed": 50044,
+      "return": 32.616046865005046,
+      "steps": 412,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.020678400993347168,
+      "final_distance_m": 1.8547827457961032
+    },
+    {
+      "episode": 45,
+      "seed": 50045,
+      "return": 72.26783504150808,
+      "steps": 990,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.05515044927597046,
+      "final_distance_m": 1.8726822235895255
+    },
+    {
+      "episode": 46,
+      "seed": 50046,
+      "return": 37.72052053408697,
+      "steps": 375,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.02347540855407715,
+      "final_distance_m": 1.8698350948875555
+    },
+    {
+      "episode": 47,
+      "seed": 50047,
+      "return": 35.21134856110439,
+      "steps": 320,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.020665466785430908,
+      "final_distance_m": 1.9929660852347861
+    },
+    {
+      "episode": 48,
+      "seed": 50048,
+      "return": 32.36414066515863,
+      "steps": 355,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.020019710063934326,
+      "final_distance_m": 1.7171980699258522
+    },
+    {
+      "episode": 49,
+      "seed": 50049,
+      "return": 39.26571425143629,
+      "steps": 466,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.025972843170166016,
+      "final_distance_m": 1.7568583724171596
+    },
+    {
+      "episode": 50,
+      "seed": 50050,
+      "return": 45.81071047158912,
+      "steps": 588,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03244423866271973,
+      "final_distance_m": 1.7565913247579006
+    },
+    {
+      "episode": 51,
+      "seed": 50051,
+      "return": 37.11981170298532,
+      "steps": 579,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.027498841285705566,
+      "final_distance_m": 1.9352568046175636
+    },
+    {
+      "episode": 52,
+      "seed": 50052,
+      "return": 48.94476457498968,
+      "steps": 672,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03833043575286865,
+      "final_distance_m": 1.970613550472306
+    },
+    {
+      "episode": 53,
+      "seed": 50053,
+      "return": 42.05761522985995,
+      "steps": 349,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.027190327644348145,
+      "final_distance_m": 1.9815979342595713
+    },
+    {
+      "episode": 54,
+      "seed": 50054,
+      "return": 56.311839155852795,
+      "steps": 802,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04572904109954834,
+      "final_distance_m": 1.776188119725981
+    },
+    {
+      "episode": 55,
+      "seed": 50055,
+      "return": 40.09254368999973,
+      "steps": 491,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.028702616691589355,
+      "final_distance_m": 1.9573975886322492
+    },
+    {
+      "episode": 56,
+      "seed": 50056,
+      "return": 49.4265756085515,
+      "steps": 528,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03643578290939331,
+      "final_distance_m": 1.8846263564658947
+    },
+    {
+      "episode": 57,
+      "seed": 50057,
+      "return": 65.8295229175128,
+      "steps": 833,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04793626070022583,
+      "final_distance_m": 1.7704397243278827
+    },
+    {
+      "episode": 58,
+      "seed": 50058,
+      "return": 66.63101768959314,
+      "steps": 786,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04945182800292969,
+      "final_distance_m": 1.9288191845415386
+    },
+    {
+      "episode": 59,
+      "seed": 50059,
+      "return": 42.82650015829131,
+      "steps": 361,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.029066145420074463,
+      "final_distance_m": 1.878429460070318
+    },
+    {
+      "episode": 60,
+      "seed": 50060,
+      "return": 62.784729128703475,
+      "steps": 708,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.045663535594940186,
+      "final_distance_m": 1.9088828268027573
+    },
+    {
+      "episode": 61,
+      "seed": 50061,
+      "return": 56.56781301507726,
+      "steps": 646,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04211997985839844,
+      "final_distance_m": 1.9756071595848732
+    },
+    {
+      "episode": 62,
+      "seed": 50062,
+      "return": 51.29552378086373,
+      "steps": 706,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04104411602020264,
+      "final_distance_m": 1.9604745140800666
+    },
+    {
+      "episode": 63,
+      "seed": 50063,
+      "return": 65.60450677853078,
+      "steps": 981,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.05416977405548096,
+      "final_distance_m": 1.7686218797533853
+    },
+    {
+      "episode": 64,
+      "seed": 50064,
+      "return": 39.1108513334766,
+      "steps": 458,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.02595120668411255,
+      "final_distance_m": 1.8125685206812807
+    },
+    {
+      "episode": 65,
+      "seed": 50065,
+      "return": 50.43384809605777,
+      "steps": 743,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03998368978500366,
+      "final_distance_m": 1.8088659454477598
+    },
+    {
+      "episode": 66,
+      "seed": 50066,
+      "return": 58.829906625673175,
+      "steps": 655,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.043089210987091064,
+      "final_distance_m": 1.9979941307473075
+    },
+    {
+      "episode": 67,
+      "seed": 50067,
+      "return": 46.73378673894331,
+      "steps": 446,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.0334162712097168,
+      "final_distance_m": 1.9005416022715804
+    },
+    {
+      "episode": 68,
+      "seed": 50068,
+      "return": 50.24929721234366,
+      "steps": 698,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04006600379943848,
+      "final_distance_m": 1.7926495467020915
+    },
+    {
+      "episode": 69,
+      "seed": 50069,
+      "return": 70.13951283646747,
+      "steps": 947,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.05695366859436035,
+      "final_distance_m": 1.8092334877934233
+    },
+    {
+      "episode": 70,
+      "seed": 50070,
+      "return": 50.78703508106992,
+      "steps": 692,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03948169946670532,
+      "final_distance_m": 1.8307612045531578
+    },
+    {
+      "episode": 71,
+      "seed": 50071,
+      "return": 55.2856226474978,
+      "steps": 605,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.039396703243255615,
+      "final_distance_m": 1.9442774858093723
+    },
+    {
+      "episode": 72,
+      "seed": 50072,
+      "return": 46.674525232519954,
+      "steps": 451,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.032148540019989014,
+      "final_distance_m": 1.9481714479580223
+    },
+    {
+      "episode": 73,
+      "seed": 50073,
+      "return": 53.95401569781825,
+      "steps": 737,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.040119707584381104,
+      "final_distance_m": 1.9355255078729743
+    },
+    {
+      "episode": 74,
+      "seed": 50074,
+      "return": 33.54273491026834,
+      "steps": 456,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.02362513542175293,
+      "final_distance_m": 1.975328853871783
+    },
+    {
+      "episode": 75,
+      "seed": 50075,
+      "return": 54.06450217217207,
+      "steps": 718,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.039368629455566406,
+      "final_distance_m": 1.9881380357373826
+    },
+    {
+      "episode": 76,
+      "seed": 50076,
+      "return": 57.82278767740354,
+      "steps": 823,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04530411958694458,
+      "final_distance_m": 1.8611771548125704
+    },
+    {
+      "episode": 77,
+      "seed": 50077,
+      "return": 43.375702844932675,
+      "steps": 563,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03131580352783203,
+      "final_distance_m": 1.9047794317409252
+    },
+    {
+      "episode": 78,
+      "seed": 50078,
+      "return": 54.434743313118815,
+      "steps": 717,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.039483070373535156,
+      "final_distance_m": 1.7282660613187752
+    },
+    {
+      "episode": 79,
+      "seed": 50079,
+      "return": 53.682550597935915,
+      "steps": 752,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04229843616485596,
+      "final_distance_m": 1.7007702515516199
+    },
+    {
+      "episode": 80,
+      "seed": 50080,
+      "return": 35.671526450198144,
+      "steps": 388,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.02332240343093872,
+      "final_distance_m": 1.9654641497618697
+    },
+    {
+      "episode": 81,
+      "seed": 50081,
+      "return": 51.12906737998128,
+      "steps": 640,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.039927899837493896,
+      "final_distance_m": 1.927439079589534
+    },
+    {
+      "episode": 82,
+      "seed": 50082,
+      "return": 32.27048783423379,
+      "steps": 400,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.022593438625335693,
+      "final_distance_m": 1.9830517132403238
+    },
+    {
+      "episode": 83,
+      "seed": 50083,
+      "return": 45.72072407696396,
+      "steps": 603,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.033412039279937744,
+      "final_distance_m": 1.822011544451372
+    },
+    {
+      "episode": 84,
+      "seed": 50084,
+      "return": 72.07474768022075,
+      "steps": 770,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.050746023654937744,
+      "final_distance_m": 1.9945915495364632
+    },
+    {
+      "episode": 85,
+      "seed": 50085,
+      "return": 57.699027294293046,
+      "steps": 831,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.044153571128845215,
+      "final_distance_m": 1.9642482799481076
+    },
+    {
+      "episode": 86,
+      "seed": 50086,
+      "return": 48.771147364750504,
+      "steps": 492,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.0342370867729187,
+      "final_distance_m": 1.9748152879455454
+    },
+    {
+      "episode": 87,
+      "seed": 50087,
+      "return": 43.40652529988438,
+      "steps": 562,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03083091974258423,
+      "final_distance_m": 1.9857513283251829
+    },
+    {
+      "episode": 88,
+      "seed": 50088,
+      "return": 33.19969499250874,
+      "steps": 427,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.02261197566986084,
+      "final_distance_m": 1.8826969247107772
+    },
+    {
+      "episode": 89,
+      "seed": 50089,
+      "return": 40.114667570218444,
+      "steps": 554,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.029091358184814453,
+      "final_distance_m": 1.909843403689937
+    },
+    {
+      "episode": 90,
+      "seed": 50090,
+      "return": 67.36457123002037,
+      "steps": 875,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.05270814895629883,
+      "final_distance_m": 1.8822411390902316
+    },
+    {
+      "episode": 91,
+      "seed": 50091,
+      "return": 50.823024802841246,
+      "steps": 607,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.0386277437210083,
+      "final_distance_m": 1.9528112561729847
+    },
+    {
+      "episode": 92,
+      "seed": 50092,
+      "return": 48.83508327929303,
+      "steps": 502,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.03407055139541626,
+      "final_distance_m": 1.9855170614697262
+    },
+    {
+      "episode": 93,
+      "seed": 50093,
+      "return": 58.93165158154443,
+      "steps": 674,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.04183638095855713,
+      "final_distance_m": 1.9309054012522162
+    },
+    {
+      "episode": 94,
+      "seed": 50094,
+      "return": 35.53638376528397,
+      "steps": 297,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.023384392261505127,
+      "final_distance_m": 1.754824803664104
+    },
+    {
+      "episode": 95,
+      "seed": 50095,
+      "return": 40.070464709308,
+      "steps": 406,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.026498079299926758,
+      "final_distance_m": 1.9901045528462968
+    },
+    {
+      "episode": 96,
+      "seed": 50096,
+      "return": 65.54234209982678,
+      "steps": 835,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.05226188898086548,
+      "final_distance_m": 1.9439887498405268
+    },
+    {
+      "episode": 97,
+      "seed": 50097,
+      "return": 32.90129534993321,
+      "steps": 404,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.02108246088027954,
+      "final_distance_m": 1.8201360851307977
+    },
+    {
+      "episode": 98,
+      "seed": 50098,
+      "return": 43.47630478767678,
+      "steps": 582,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.032318055629730225,
+      "final_distance_m": 1.8982333701169682
+    },
+    {
+      "episode": 99,
+      "seed": 50099,
+      "return": 31.995094010140747,
+      "steps": 393,
+      "success": true,
+      "collision_events": 0,
+      "battery_fraction_used": 0.022312819957733154,
+      "final_distance_m": 1.8802893567870669
+    }
+  ]
+}

@@ -49,6 +49,15 @@ public:
         double dt
     ) const;
 
+    /**
+     * @brief Dynamic multi-agent traffic separation filter applied to any candidate velocity.
+     */
+    [[nodiscard]] VelocityCommand applyTrafficAvoidance(
+        const UAVState& uav,
+        const VelocityCommand& baseCommand,
+        const std::vector<UAVState>& traffic
+    ) const;
+
     [[nodiscard]] const WaypointControllerConfig& getConfig() const noexcept { return m_config; }
 
 private:

@@ -71,6 +71,16 @@ public:
     ) const;
 
     /**
+     * @brief Check swept displacement against world boundary limits.
+     */
+    [[nodiscard]] bool checkBoundaryCollision(
+        const Vec3& start,
+        const Vec3& end,
+        const CityMap& map,
+        CollisionEvent& outEvent
+    ) const;
+
+    /**
      * @brief Check pairwise continuous conflict between two moving UAVs.
      */
     [[nodiscard]] bool checkDynamicCollision(

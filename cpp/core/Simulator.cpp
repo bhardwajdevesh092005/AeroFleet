@@ -200,8 +200,8 @@ void Simulator::integratePhysicsSubStep(double dt, const std::vector<VelocityCom
             }
         }
 
-        // 3. Dispatch heuristic coordinator
-        if (currentTime - m_lastCoordinatorDispatchTime >= m_config.simulation.dtCoordinator) {
+        // 3. Dispatch heuristic coordinator (if auto-dispatch is enabled)
+        if (m_autoCoordinatorDispatch && (currentTime - m_lastCoordinatorDispatchTime >= m_config.simulation.dtCoordinator)) {
             m_coordinator.dispatch(m_fleet, m_pendingRequests, m_map, currentTime);
             for (const auto& request : m_pendingRequests) {
                 if (request.status == RequestStatus::ASSIGNED) {
@@ -239,7 +239,12 @@ void Simulator::integratePhysicsSubStep(double dt, const std::vector<VelocityCom
         } else if (uav.mode == UAVMode::FLYING_TO_PICKUP ||
                    uav.mode == UAVMode::FLYING_TO_DESTINATION ||
                    uav.mode == UAVMode::RETURNING_TO_CHARGE) {
-            cmd = m_navigator.computeActionWithTraffic(uav, m_map, trafficSnapshot, dt);
+            if (m_navPolicy) {
+                cmd = m_navPolicy->computeAction(uav, m_map, dt);
+                cmd = m_navigator.applyTrafficAvoidance(uav, cmd, trafficSnapshot);
+            } else {
+                cmd = m_navigator.computeActionWithTraffic(uav, m_map, trafficSnapshot, dt);
+            }
         }
         m_integrator.stepVelocityCommand(uav, cmd, dt);
         m_fleet.getBatteryModel().stepDischarge(uav, dt);
@@ -575,6 +580,35 @@ float Simulator::computeNavigationReward(
     if (succeeded) reward += 10.0f;
     if (failed) reward -= 10.0f;
     return reward;
+}
+
+bool Simulator::dispatchRequest(UAVId uavId, RequestId requestId) {
+    if (uavId < 0 || static_cast<size_t>(uavId) >= m_fleet.size()) return false;
+    auto it = std::find_if(m_pendingRequests.begin(), m_pendingRequests.end(),
+                           [requestId](const DeliveryRequest& r) { return r.id == requestId; });
+    if (it == m_pendingRequests.end()) return false;
+
+    DeliveryRequest req = *it;
+    if (req.status != RequestStatus::PENDING) return false;
+
+    if (m_fleet.assignRequest(uavId, req)) {
+        req.transitionTo(RequestStatus::ASSIGNED, m_clock.now());
+        req.assignedUavId = uavId;
+        m_logger.log(m_clock.now(), SimulationEventType::REQUEST_ASSIGNED, req.id, uavId);
+        m_pendingRequests.erase(it);
+        return true;
+    }
+    return false;
+}
+
+StepResult Simulator::stepCoordinator(double intervalSeconds) {
+    const double dtPolicy = m_config.simulation.dtPolicy;
+    const int steps = std::max(1, static_cast<int>(std::round(intervalSeconds / dtPolicy)));
+    StepResult finalRes;
+    for (int s = 0; s < steps; ++s) {
+        finalRes = step({});
+    }
+    return finalRes;
 }
 
 } // namespace aerofleet

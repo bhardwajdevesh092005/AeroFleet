@@ -1,0 +1,8 @@
+{
+  "model_name": "AeroFleetCoordinatorPolicy",
+  "algorithm": "MaskablePPO",
+  "action_space": 101,
+  "observation_dim": 164,
+  "total_timesteps": 10000,
+  "seed": 42
+}

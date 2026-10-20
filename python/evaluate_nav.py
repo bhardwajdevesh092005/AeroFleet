@@ -46,7 +46,20 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
-def _run_policy(model: Any, env: Any, episodes: int, seed: int) -> dict[str, Any]:
+def _normalize_observation(obs: np.ndarray, norm_data: dict[str, Any] | None) -> np.ndarray:
+    if norm_data is None:
+        return obs
+    mean = np.asarray(norm_data["mean"], dtype=np.float32)
+    var = np.asarray(norm_data["var"], dtype=np.float32)
+    eps = float(norm_data.get("epsilon", 1e-8))
+    clip_obs = float(norm_data.get("clip_obs", 10.0))
+    normalized = (obs - mean) / np.sqrt(var + eps)
+    return np.clip(normalized, -clip_obs, clip_obs).astype(np.float32)
+
+
+def _run_policy(
+    model: Any, env: Any, episodes: int, seed: int, norm_data: dict[str, Any] | None = None
+) -> dict[str, Any]:
     returns: list[float] = []
     lengths: list[int] = []
     successes: list[bool] = []
@@ -63,7 +76,8 @@ def _run_policy(model: Any, env: Any, episodes: int, seed: int) -> dict[str, Any
         terminated = truncated = False
         info: dict[str, Any] = {}
         while not (terminated or truncated):
-            action, _ = model.predict(observation, deterministic=True)
+            obs_for_model = _normalize_observation(observation, norm_data)
+            action, _ = model.predict(obs_for_model, deterministic=True)
             observation, reward, terminated, truncated, info = env.step(action)
             episode_return += float(reward)
             steps += 1
@@ -159,7 +173,13 @@ def main() -> None:
         if saved_schema != current_schema:
             raise SystemExit("Model observation normalization/features do not match the current environment")
         model = PPO.load(str(args.model), env=env, device=args.device)
-        results = _run_policy(model, env, args.episodes, args.seed)
+        norm_candidates = [
+            args.model.parent / "normalization.json",
+            args.model.parent.parent / "normalization.json",
+        ]
+        norm_file = next((p for p in norm_candidates if p.is_file()), None)
+        norm_data = json.loads(norm_file.read_text(encoding="utf-8")) if norm_file else None
+        results = _run_policy(model, env, args.episodes, args.seed, norm_data=norm_data)
     finally:
         env.close()
 

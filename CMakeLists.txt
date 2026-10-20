@@ -59,6 +59,14 @@ if(NOT raylib_FOUND)
     set(raylib_FOUND TRUE)
 endif()
 
+# ONNX Runtime dependency
+set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime")
+if(EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.h")
+    set(ONNXRUNTIME_INCLUDE_DIR "${ONNXRUNTIME_ROOT}/include")
+    set(ONNXRUNTIME_LIBRARY "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
+    set(ONNXRUNTIME_FOUND TRUE)
+endif()
+
 # Global include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cpp)
 
@@ -73,6 +81,9 @@ add_library(AeroFleetCore STATIC
     cpp/requests/RequestGenerator.cpp
     cpp/fleet/FleetManager.cpp
     cpp/control/WaypointController.cpp
+    cpp/control/SafetyLayer.cpp
+    cpp/control/ONNXNavigationPolicy.cpp
+    cpp/inference/ONNXModel.cpp
     cpp/coordinator/HeuristicCoordinator.cpp
     cpp/visualization/CameraController.cpp
     cpp/visualization/Renderer.cpp
@@ -81,10 +92,17 @@ add_library(AeroFleetCore STATIC
 
 target_include_directories(AeroFleetCore PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp
+    ${ONNXRUNTIME_INCLUDE_DIR}
 )
 
 target_link_libraries(AeroFleetCore PUBLIC
     raylib
+    ${ONNXRUNTIME_LIBRARY}
+)
+
+set_target_properties(AeroFleetCore PROPERTIES
+    BUILD_RPATH "${ONNXRUNTIME_ROOT}/lib"
+    INSTALL_RPATH "${ONNXRUNTIME_ROOT}/lib"
 )
 
 # Main simulation executable (built when raylib is available)
@@ -216,12 +234,29 @@ target_link_libraries(test_simulator PRIVATE AeroFleetCore)
 add_test(NAME SimulatorTests COMMAND test_simulator)
 set_tests_properties(SimulatorTests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# Optional Python pybind11 module. Prefer installed CMake packages; retain a
-# workspace-local header fallback without pinning a Python minor version/ABI.
+# Unit and integration tests: Embedded C++ ONNX Runtime Engine & Navigation Safety Layer
+add_executable(test_onnx_runtime
+    tests/test_onnx_runtime.cpp
+)
+target_link_libraries(test_onnx_runtime PRIVATE AeroFleetCore)
+set_target_properties(test_onnx_runtime PROPERTIES
+    BUILD_RPATH "${ONNXRUNTIME_ROOT}/lib"
+)
+add_test(NAME ONNXRuntimeTests COMMAND test_onnx_runtime)
+set_tests_properties(ONNXRuntimeTests PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    ENVIRONMENT "LD_LIBRARY_PATH=${ONNXRUNTIME_ROOT}/lib:$ENV{LD_LIBRARY_PATH}"
+)
+
+# Optional Python pybind11 module. Prefer installed CMake packages, then use
+# the hermetic Python/pybind11 development files kept under third_party/.  The
+# latter matters on course/lab machines where the Python interpreter exists
+# but its development package is not installed system-wide.
 find_package(Python3 COMPONENTS Interpreter Development.Module QUIET)
 find_package(pybind11 CONFIG QUIET)
 
 set(AEROFLEET_PYTHON_BINDINGS_AVAILABLE FALSE)
+set(AEROFLEET_PYTHON_EXECUTABLE "${Python3_EXECUTABLE}")
 if(Python3_FOUND AND pybind11_FOUND)
     pybind11_add_module(aerofleet_cpp MODULE
         python/bindings/aerofleet_bindings.cpp
@@ -229,18 +264,52 @@ if(Python3_FOUND AND pybind11_FOUND)
     target_link_libraries(aerofleet_cpp PRIVATE AeroFleetCore)
     set_target_properties(aerofleet_cpp PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python"
+        BUILD_RPATH "${ONNXRUNTIME_ROOT}/lib"
+        INSTALL_RPATH "${ONNXRUNTIME_ROOT}/lib"
     )
     set(AEROFLEET_PYTHON_BINDINGS_AVAILABLE TRUE)
 else()
     set(PYBIND11_INC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/include")
-    if(Python3_FOUND AND EXISTS "${PYBIND11_INC_DIR}/pybind11/pybind11.h" AND Python3_Development.Module_FOUND)
+    set(AEROFLEET_VENDORED_PYTHON_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr")
+    file(GLOB AEROFLEET_VENDORED_PYTHON_INCLUDE_DIRS
+        "${AEROFLEET_VENDORED_PYTHON_ROOT}/include/python3.*"
+    )
+    if(NOT AEROFLEET_PYTHON_EXECUTABLE)
+        find_program(AEROFLEET_PYTHON_EXECUTABLE NAMES python3 python)
+    endif()
+    if(EXISTS "${PYBIND11_INC_DIR}/pybind11/pybind11.h"
+       AND AEROFLEET_VENDORED_PYTHON_INCLUDE_DIRS
+       AND AEROFLEET_PYTHON_EXECUTABLE)
+        execute_process(
+            COMMAND "${AEROFLEET_PYTHON_EXECUTABLE}" -c
+                    "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX') or '')"
+            OUTPUT_VARIABLE AEROFLEET_PYTHON_EXTENSION_SUFFIX
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(NOT AEROFLEET_PYTHON_EXTENSION_SUFFIX)
+            set(AEROFLEET_PYTHON_EXTENSION_SUFFIX ".so")
+        endif()
         add_library(aerofleet_cpp MODULE python/bindings/aerofleet_bindings.cpp)
-        target_include_directories(aerofleet_cpp SYSTEM PRIVATE "${PYBIND11_INC_DIR}" ${Python3_INCLUDE_DIRS})
-        target_link_libraries(aerofleet_cpp PRIVATE AeroFleetCore Python3::Module)
+        target_include_directories(aerofleet_cpp SYSTEM PRIVATE
+            "${PYBIND11_INC_DIR}" ${AEROFLEET_VENDORED_PYTHON_INCLUDE_DIRS}
+        )
+        if(WIN32)
+            find_package(Python3 COMPONENTS Development.Module QUIET)
+            if(TARGET Python3::Module)
+                target_link_libraries(aerofleet_cpp PRIVATE AeroFleetCore Python3::Module)
+            else()
+                target_link_libraries(aerofleet_cpp PRIVATE AeroFleetCore)
+            endif()
+        else()
+            # On UNIX/Linux, a MODULE library must not link libpython directly
+            target_link_libraries(aerofleet_cpp PRIVATE AeroFleetCore)
+        endif()
         set_target_properties(aerofleet_cpp PROPERTIES
             PREFIX ""
-            SUFFIX ".${Python3_SOABI}${CMAKE_SHARED_MODULE_SUFFIX}"
+            SUFFIX "${AEROFLEET_PYTHON_EXTENSION_SUFFIX}"
             LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/python"
+            BUILD_RPATH "${ONNXRUNTIME_ROOT}/lib"
+            INSTALL_RPATH "${ONNXRUNTIME_ROOT}/lib"
         )
         set(AEROFLEET_PYTHON_BINDINGS_AVAILABLE TRUE)
     endif()
@@ -250,27 +319,75 @@ if(AEROFLEET_PYTHON_BINDINGS_AVAILABLE)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(aerofleet_cpp PRIVATE -fvisibility=hidden)
     endif()
+
+    set(AEROFLEET_TEST_PYTHONPATH "${CMAKE_CURRENT_SOURCE_DIR}/python")
+    set(AEROFLEET_VENDORED_DIST_PKG "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/python3/dist-packages")
+    if(EXISTS "${AEROFLEET_VENDORED_DIST_PKG}")
+        if(WIN32)
+            set(AEROFLEET_TEST_PYTHONPATH "${AEROFLEET_TEST_PYTHONPATH};${AEROFLEET_VENDORED_DIST_PKG}")
+        else()
+            set(AEROFLEET_TEST_PYTHONPATH "${AEROFLEET_TEST_PYTHONPATH}:${AEROFLEET_VENDORED_DIST_PKG}")
+        endif()
+    endif()
+
+    set(AEROFLEET_TEST_ENV
+        "PYTHONPATH=${AEROFLEET_TEST_PYTHONPATH}"
+    )
+    if(NOT WIN32)
+        set(AEROFLEET_VENDORED_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/usr/lib/x86_64-linux-gnu")
+        if(EXISTS "${AEROFLEET_VENDORED_LIB_DIR}")
+            list(APPEND AEROFLEET_TEST_ENV
+                "LD_LIBRARY_PATH=${AEROFLEET_VENDORED_LIB_DIR}/lapack:${AEROFLEET_VENDORED_LIB_DIR}/blas:${AEROFLEET_VENDORED_LIB_DIR}:$ENV{LD_LIBRARY_PATH}"
+            )
+        endif()
+    endif()
+
     add_test(NAME PythonBindingTests
-        COMMAND ${Python3_EXECUTABLE} tests/test_bindings.py
+        COMMAND ${AEROFLEET_PYTHON_EXECUTABLE} tests/test_bindings.py
     )
     set_tests_properties(PythonBindingTests PROPERTIES
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
+        ENVIRONMENT "${AEROFLEET_TEST_ENV}"
     )
 
     execute_process(
-        COMMAND ${Python3_EXECUTABLE} -c "import gymnasium, numpy, pytest"
+        COMMAND ${AEROFLEET_PYTHON_EXECUTABLE} -c
+                "try:\n    import gymnasium, numpy, pytest\nexcept Exception:\n    import sys; sys.path.insert(0, '${AEROFLEET_VENDORED_DIST_PKG}'); import gymnasium, numpy, pytest"
         RESULT_VARIABLE AEROFLEET_RL_PYTHON_DEPS_RESULT
         OUTPUT_QUIET
         ERROR_QUIET
     )
     if(AEROFLEET_RL_PYTHON_DEPS_RESULT EQUAL 0)
         add_test(NAME GymnasiumNavigationTests
-            COMMAND ${Python3_EXECUTABLE} -m pytest -q tests/test_nav_env.py
+            COMMAND ${AEROFLEET_PYTHON_EXECUTABLE} -m pytest -q tests/test_nav_env.py
         )
         set_tests_properties(GymnasiumNavigationTests PROPERTIES
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-            ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/python"
+            ENVIRONMENT "${AEROFLEET_TEST_ENV}"
+        )
+
+        add_test(NAME DifferentialPhysicsTests
+            COMMAND ${AEROFLEET_PYTHON_EXECUTABLE} -m pytest -q tests/test_differential_physics.py
+        )
+        set_tests_properties(DifferentialPhysicsTests PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "${AEROFLEET_TEST_ENV}"
+        )
+
+        add_test(NAME ONNXExportTests
+            COMMAND ${AEROFLEET_PYTHON_EXECUTABLE} -m pytest -q tests/test_onnx_export.py
+        )
+        set_tests_properties(ONNXExportTests PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "${AEROFLEET_TEST_ENV}"
+        )
+
+        add_test(NAME CoordinatorEnvironmentTests
+            COMMAND ${AEROFLEET_PYTHON_EXECUTABLE} -m pytest -q tests/test_coordinator_env.py
+        )
+        set_tests_properties(CoordinatorEnvironmentTests PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            ENVIRONMENT "${AEROFLEET_TEST_ENV}"
         )
     else()
         message(STATUS "Gymnasium/NumPy/pytest not found; skipping Gymnasium navigation integration tests.")

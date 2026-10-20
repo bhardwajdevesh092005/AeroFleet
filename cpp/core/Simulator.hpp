@@ -15,6 +15,7 @@
 #include "fleet/FleetManager.hpp"
 #include "requests/RequestGenerator.hpp"
 #include "control/WaypointController.hpp"
+#include "control/INavigationPolicy.hpp"
 #include "coordinator/HeuristicCoordinator.hpp"
 #include "physics/CollisionSystem.hpp"
 #include "physics/Kinematics.hpp"
@@ -112,6 +113,18 @@ public:
     [[nodiscard]] size_t getFleetSize() const noexcept { return m_fleet.size(); }
     [[nodiscard]] bool navigationTaskSucceeded() const noexcept { return m_navigationTaskSucceeded; }
 
+    void setAutoCoordinatorDispatch(bool enable) noexcept { m_autoCoordinatorDispatch = enable; }
+    [[nodiscard]] bool getAutoCoordinatorDispatch() const noexcept { return m_autoCoordinatorDispatch; }
+
+    bool dispatchRequest(UAVId uavId, RequestId requestId);
+    [[nodiscard]] const std::vector<DeliveryRequest>& getPendingRequests() const noexcept { return m_pendingRequests; }
+    [[nodiscard]] const std::vector<DeliveryRequest>& getDeliveredRequests() const noexcept { return m_deliveredRequests; }
+
+    void setNavigationPolicy(std::shared_ptr<INavigationPolicy> policy) { m_navPolicy = std::move(policy); }
+    [[nodiscard]] const INavigationPolicy* getNavigationPolicy() const noexcept { return m_navPolicy.get(); }
+
+    StepResult stepCoordinator(double intervalSeconds = 1.0);
+
     void setSeed(uint64_t seed) { m_config.simulation.randomSeed = seed; reset(seed); }
 
 private:
@@ -139,6 +152,8 @@ private:
     bool m_navigationTaskSucceeded{false};
     Vec3 m_navigationTarget{0.0, 0.0, 0.0};
     double m_navigationArrivalRadius{2.0};
+    bool m_autoCoordinatorDispatch{true};
+    std::shared_ptr<INavigationPolicy> m_navPolicy{nullptr};
 
     void integratePhysicsSubStep(double dt, const std::vector<VelocityCommand>& actions);
     [[nodiscard]] std::vector<float> computeLidarBeams(const Vec3& position, double yaw, double maxRange = 100.0) const;

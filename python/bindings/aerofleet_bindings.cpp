@@ -13,6 +13,7 @@
 #include "requests/DeliveryRequest.hpp"
 #include "physics/Kinematics.hpp"
 #include "math/Vec3.hpp"
+#include "control/ONNXNavigationPolicy.hpp"
 
 namespace py = pybind11;
 using namespace aerofleet;
@@ -335,6 +336,20 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
             const auto& f = self.getConfig().fleet;
             return std::sqrt(2.0 * f.maxHorizontalSpeed * f.maxHorizontalSpeed +
                              f.maxVerticalSpeed * f.maxVerticalSpeed);
-        });
+        })
+        .def("set_auto_coordinator_dispatch", &Simulator::setAutoCoordinatorDispatch, py::arg("enable"))
+        .def("get_auto_coordinator_dispatch", &Simulator::getAutoCoordinatorDispatch)
+        .def("dispatch_request", &Simulator::dispatchRequest, py::arg("uav_id"), py::arg("request_id"))
+        .def("get_pending_requests", &Simulator::getPendingRequests)
+        .def("get_delivered_requests", &Simulator::getDeliveredRequests)
+        .def("step_coordinator", [](Simulator& self, double intervalSeconds) {
+            py::gil_scoped_release release;
+            return self.stepCoordinator(intervalSeconds);
+        }, py::arg("interval_seconds") = 1.0)
+        .def("enable_onnx_navigation", [](Simulator& self, const std::string& modelPath, const std::string& normPath) {
+            auto policy = std::make_shared<ONNXNavigationPolicy>(modelPath, normPath);
+            self.setNavigationPolicy(policy);
+        }, py::arg("model_path") = "models/navigation/nav_policy.onnx",
+           py::arg("norm_path") = "models/navigation/normalization.json");
 }
 

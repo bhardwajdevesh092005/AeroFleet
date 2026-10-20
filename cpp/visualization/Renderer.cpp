@@ -1,6 +1,7 @@
 #include "visualization/Renderer.hpp"
 #include <iomanip>
 #include <sstream>
+#include <cstdlib>
 
 namespace aerofleet {
 
@@ -27,6 +28,17 @@ Renderer::~Renderer() {
 
 bool Renderer::init() {
     if (m_initialized) return true;
+
+#if defined(__linux__)
+    const char* display = std::getenv("DISPLAY");
+    const char* wayland = std::getenv("WAYLAND_DISPLAY");
+    const bool hasDisplay = (display != nullptr && display[0] != '\0');
+    const bool hasWayland = (wayland != nullptr && wayland[0] != '\0');
+    if (!hasDisplay && !hasWayland) {
+        m_initialized = false;
+        return false;
+    }
+#endif
 
     SetTraceLogLevel(LOG_WARNING);
     InitWindow(m_config.screenWidth, m_config.screenHeight, m_config.windowTitle.c_str());

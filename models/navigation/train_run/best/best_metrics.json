@@ -1,0 +1,11 @@
+{
+  "timesteps": 170000,
+  "seed_start": 1000042,
+  "seed_end": 1000061,
+  "episodes": 20,
+  "mean_return": 37.96631337655708,
+  "success_rate": 0.0,
+  "mean_episode_steps": 600.0,
+  "mean_final_distance_m": 41.4420260636545,
+  "collision_episode_rate": 0.0
+}

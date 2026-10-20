@@ -159,6 +159,32 @@ void test_deterministic_conflict_resolution() {
         "Canonical pair IDs must match regardless of vector input ordering");
 }
 
+void test_world_boundary_collision() {
+    CityMap map;
+    map.worldMin = Vec3(-100.0, -100.0, 0.0);
+    map.worldMax = Vec3(100.0, 100.0, 50.0);
+    map.rebuildBroadphase(50.0);
+
+    CollisionSystem colSys(0.5);
+
+    // UAV stepping out of bounds across East boundary (X = 101.0 > 100.0 - 0.5)
+    UAVState uav;
+    uav.id = 3;
+    uav.position = Vec3(101.0, 0.0, 20.0);
+    Vec3 prevPos(98.0, 0.0, 20.0);
+
+    std::vector<UAVState> uavs = { uav };
+    std::vector<Vec3> prevPositions = { prevPos };
+
+    auto events = colSys.evaluateAndResolve(uavs, prevPositions, map, 1.0);
+
+    TEST_ASSERT(events.size() == 1, "Exactly 1 boundary collision event must be registered");
+    TEST_ASSERT(events[0].type == CollisionType::WORLD_BOUNDARY, "Event type must be WORLD_BOUNDARY");
+    TEST_ASSERT(events[0].uavIdA == 3, "UAV ID must match");
+    TEST_ASSERT(uavs[0].position == prevPos, "UAV position must roll back to previous safe position");
+    TEST_ASSERT(uavs[0].mode == UAVMode::EMERGENCY, "UAV mode must switch to EMERGENCY upon boundary collision");
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "     AeroFleet Collision Tests          \n";
@@ -169,6 +195,7 @@ int main() {
     RUN_TEST(test_uav_uav_head_on_collision);
     RUN_TEST(test_uav_uav_safe_vertical_separation);
     RUN_TEST(test_deterministic_conflict_resolution);
+    RUN_TEST(test_world_boundary_collision);
 
     std::cout << "========================================\n";
     std::cout << "Summary: " << g_testsPassed << " Passed, " << g_testsFailed << " Failed\n";

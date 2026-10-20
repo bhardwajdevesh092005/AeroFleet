@@ -42,11 +42,58 @@ bool CollisionSystem::checkStaticCollision(
     return false;
 }
 
+bool CollisionSystem::checkBoundaryCollision(
+    const Vec3& start,
+    const Vec3& end,
+    const CityMap& map,
+    CollisionEvent& outEvent
+) const {
+    (void)start;
+    bool breached = false;
+    Vec3 normal(0.0, 0.0, 0.0);
+
+    if (end.x < map.worldMin.x) {
+        breached = true;
+        normal.x = 1.0;
+    } else if (end.x > map.worldMax.x) {
+        breached = true;
+        normal.x = -1.0;
+    }
+
+    if (end.y < map.worldMin.y) {
+        breached = true;
+        normal.y = 1.0;
+    } else if (end.y > map.worldMax.y) {
+        breached = true;
+        normal.y = -1.0;
+    }
+
+    if (end.z > map.worldMax.z) {
+        breached = true;
+        normal.z = -1.0;
+    } else if (end.z < map.worldMin.z) {
+        breached = true;
+        normal.z = 1.0;
+    }
+
+    if (breached) {
+        outEvent.type = CollisionType::WORLD_BOUNDARY;
+        outEvent.contactPoint = end;
+        outEvent.contactNormal = (normal.lengthSquared() > 1e-12) ? normal.normalized() : Vec3(0.0, 0.0, 1.0);
+        return true;
+    }
+    return false;
+}
+
 bool CollisionSystem::checkDynamicCollision(
     const UAVState& uavA, const Vec3& prevPosA,
     const UAVState& uavB, const Vec3& prevPosB,
     CollisionEvent& outEvent
 ) const {
+    if (uavA.isGrounded && uavB.isGrounded && uavA.position.z <= 0.1 && uavB.position.z <= 0.1) {
+        return false;
+    }
+
     const double combinedRadius = m_uavRadius + m_uavRadius;
     const double combinedRadiusSq = combinedRadius * combinedRadius;
 
@@ -76,7 +123,7 @@ std::vector<CollisionEvent> CollisionSystem::evaluateAndResolve(
 ) {
     std::vector<CollisionEvent> events;
 
-    // 1. Static building collisions
+    // 1. Static building collisions and world boundary breaches
     for (size_t i = 0; i < uavs.size() && i < prevPositions.size(); ++i) {
         auto& uav = uavs[i];
         const auto& prevPos = prevPositions[i];
@@ -92,6 +139,19 @@ std::vector<CollisionEvent> CollisionSystem::evaluateAndResolve(
             uav.velocity = Vec3(0.0, 0.0, 0.0);
             uav.acceleration = Vec3(0.0, 0.0, 0.0);
             uav.mode = UAVMode::EMERGENCY;
+        } else {
+            CollisionEvent boundaryEvent;
+            if (checkBoundaryCollision(prevPos, uav.position, map, boundaryEvent)) {
+                boundaryEvent.uavIdA = uav.id;
+                boundaryEvent.simulationTime = currentTime;
+                events.push_back(boundaryEvent);
+
+                // Roll back position and trigger emergency safety state
+                uav.position = prevPos;
+                uav.velocity = Vec3(0.0, 0.0, 0.0);
+                uav.acceleration = Vec3(0.0, 0.0, 0.0);
+                uav.mode = UAVMode::EMERGENCY;
+            }
         }
     }
 

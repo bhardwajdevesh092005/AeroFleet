@@ -39,8 +39,8 @@ void FleetManager::initialize(
             spawnPos = map.chargingStations[stationIdx].position;
             if (slotIdx > 0) {
                 const double angle = static_cast<double>(slotIdx) * (MathUtils::PI * 0.5);
-                spawnPos.x += 1.2 * std::cos(angle);
-                spawnPos.y += 1.2 * std::sin(angle);
+                spawnPos.x += 3.5 * std::cos(angle);
+                spawnPos.y += 3.5 * std::sin(angle);
             }
         }
 
@@ -80,7 +80,11 @@ bool FleetManager::assignRequest(UAVId uavId, const DeliveryRequest& request) {
 
     uav.mode = UAVMode::ASSIGNED;
     uav.activeRequestId = request.id;
-    uav.targetWaypoint = request.pickupLocation;
+    if (uav.position.z < 10.0) {
+        uav.targetWaypoint = Vec3(uav.position.x, uav.position.y, 15.0);
+    } else {
+        uav.targetWaypoint = request.pickupLocation;
+    }
 
     auto& ctx = ctxIt->second;
     ctx.assignedRequestId = request.id;
@@ -213,13 +217,25 @@ void FleetManager::step(
 
 void FleetManager::handleAssigned(UAVState& uav, UAVContext& ctx) {
     uav.mode = UAVMode::FLYING_TO_PICKUP;
-    uav.targetWaypoint = ctx.activeRequest.pickupLocation;
+    if (uav.position.z < 10.0) {
+        uav.targetWaypoint = Vec3(ctx.homeBasePosition.x, ctx.homeBasePosition.y, 15.0);
+    } else {
+        uav.targetWaypoint = ctx.activeRequest.pickupLocation;
+    }
     uav.isGrounded = false;
 }
 
 void FleetManager::handleFlyingToPickup(UAVState& uav, UAVContext& ctx, double /*dt*/) {
+    if (uav.position.z < 10.0) {
+        // Maintain vertical climb corridor to clear ground charging station
+        uav.targetWaypoint = Vec3(ctx.homeBasePosition.x, ctx.homeBasePosition.y, 15.0);
+        return;
+    }
+
+    uav.targetWaypoint = ctx.activeRequest.pickupLocation;
+
     double dist = uav.position.distance(ctx.activeRequest.pickupLocation);
-    if (dist <= 1.0 && uav.speed() <= 1.0) {
+    if (dist <= 3.0) {
         uav.mode = UAVMode::PICKING_UP;
         ctx.dwellTimer = 0.0;
         uav.velocity = Vec3(0.0, 0.0, 0.0);
@@ -243,7 +259,7 @@ void FleetManager::handlePickingUp(UAVState& uav, UAVContext& ctx, double dt, do
 
 void FleetManager::handleFlyingToDestination(UAVState& uav, UAVContext& ctx, double /*dt*/) {
     double dist = uav.position.distance(ctx.activeRequest.dropoffLocation);
-    if (dist <= 1.0 && uav.speed() <= 1.0) {
+    if (dist <= 3.0) {
         uav.mode = UAVMode::DROPPING_OFF;
         ctx.dwellTimer = 0.0;
         uav.velocity = Vec3(0.0, 0.0, 0.0);
@@ -296,7 +312,7 @@ void FleetManager::handleReturningToCharge(UAVState& uav, UAVContext& ctx, CityM
 
     if (targetStation) {
         uav.targetWaypoint = targetStation->position;
-        if (m_batteryModel.isInDockingRange(uav, *targetStation) && uav.speed() <= 0.5) {
+        if (m_batteryModel.isInDockingRange(uav, *targetStation) && uav.speed() <= 2.0) {
             if (m_batteryModel.dock(uav, *targetStation)) {
                 uav.mode = UAVMode::CHARGING;
             }

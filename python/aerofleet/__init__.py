@@ -37,7 +37,8 @@ except ImportError:
 
 try:
     from .nav_env import AeroFleetNavEnv
-    __all__.append("AeroFleetNavEnv")
+    from .coordinator_env import AeroFleetCoordinatorEnv
+    __all__.extend(["AeroFleetNavEnv", "AeroFleetCoordinatorEnv"])
 except (ImportError, NameError):
     # Keep importing the package's metadata possible without optional RL deps.
     pass

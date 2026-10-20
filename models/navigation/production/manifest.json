@@ -1,0 +1,16 @@
+{
+  "task": "AeroFleet Navigation Policy",
+  "version": 2,
+  "model_type": "PPO_MlpPolicy",
+  "observation_schema_version": 3,
+  "observation_dim": 87,
+  "action_dim": 3,
+  "action_frame": "body",
+  "action_limits": {
+    "forward_mps": 15.0,
+    "left_mps": 15.0,
+    "up_mps": 5.0
+  },
+  "total_timesteps": 208896,
+  "normalization_file": "normalization.json"
+}

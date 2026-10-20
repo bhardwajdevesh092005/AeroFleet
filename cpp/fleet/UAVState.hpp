@@ -27,7 +27,7 @@ struct UAVState {
     UAVMode mode{UAVMode::IDLE};          ///< Current lifecycle operational state
     RequestId activeRequestId{-1};        ///< Assigned delivery request (-1 if none)
     Vec3 targetWaypoint{0.0, 0.0, 0.0};   ///< Current 3D waypoint target
-    bool isGrounded{true};                ///< True if UAV is stationed on pad/ground
+    bool isGrounded{false};               ///< True if UAV is stationed on pad/ground
 
     UAVState() = default;
 

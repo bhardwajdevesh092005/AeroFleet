@@ -1,0 +1,20 @@
+{
+  "task": "AeroFleet Navigation Policy",
+  "version": 2,
+  "model_type": "PPO_MlpPolicy",
+  "observation_schema_version": 3,
+  "observation_dim": 87,
+  "action_dim": 3,
+  "action_frame": "body",
+  "action_limits": {
+    "forward_mps": 15.0,
+    "left_mps": 15.0,
+    "up_mps": 5.0
+  },
+  "total_timesteps": 208896,
+  "normalization_file": "normalization.json",
+  "onnx_file": "nav_policy.onnx",
+  "onnx_sha256": "ff776157dfc8692757c29ace73c2eb6bc29d1b89e08a7bdc3baa1cad23a5b9c9",
+  "onnx_opset_version": 17,
+  "git_commit": "f43c252ba74e59e8a3a9ba2b33c6d2746e869263"
+}

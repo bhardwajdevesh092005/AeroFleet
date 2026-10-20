@@ -89,14 +89,25 @@ class AeroFleetNavEnv(gym.Env):
         max_episode_steps: int = 2_000,
         randomize_waypoint: bool = False,
         action_frame: str = "world",
+        min_route_distance: float | None = None,
+        max_route_distance: float | None = None,
     ) -> None:
         super().__init__()
         if max_episode_steps <= 0:
             raise ValueError("max_episode_steps must be positive")
+        if min_route_distance is not None and min_route_distance <= 0:
+            raise ValueError("min_route_distance must be positive")
+        if max_route_distance is not None and max_route_distance <= 0:
+            raise ValueError("max_route_distance must be positive")
+        if min_route_distance is not None and max_route_distance is not None:
+            if min_route_distance > max_route_distance:
+                raise ValueError("min_route_distance cannot exceed max_route_distance")
 
         self.config_path = str(config_path)
         self.max_episode_steps = int(max_episode_steps)
         self.randomize_waypoint = bool(randomize_waypoint)
+        self.min_route_distance = float(min_route_distance) if min_route_distance is not None else None
+        self.max_route_distance = float(max_route_distance) if max_route_distance is not None else None
         if action_frame not in ("world", "body"):
             raise ValueError("action_frame must be 'world' or 'body'")
         self.action_frame = action_frame
@@ -297,13 +308,34 @@ class AeroFleetNavEnv(gym.Env):
             )
             max_xy = min_xy + span * np.asarray([extent.x, extent.y])
             altitude = float(self.sim.default_spawn_altitude)
-            for _ in range(32):
-                start_xy = self.np_random.uniform(min_xy, max_xy)
-                target_xy = self.np_random.uniform(min_xy, max_xy)
-                if np.linalg.norm(target_xy - start_xy) >= 0.25 * min(extent.x, extent.y):
-                    break
-            else:  # pragma: no cover - only possible for unusually tiny maps
-                start_xy, target_xy = min_xy, max_xy
+            min_dist_threshold = (
+                float(options.get("min_distance", self.min_route_distance))
+                if ("min_distance" in options or self.min_route_distance is not None)
+                else 0.25 * min(extent.x, extent.y)
+            )
+            max_dist_threshold = (
+                float(options.get("max_distance", self.max_route_distance))
+                if ("max_distance" in options or self.max_route_distance is not None)
+                else None
+            )
+            if max_dist_threshold is not None:
+                for _ in range(32):
+                    start_xy = self.np_random.uniform(min_xy, max_xy)
+                    dist = self.np_random.uniform(min_dist_threshold, max_dist_threshold)
+                    angle = self.np_random.uniform(-np.pi, np.pi)
+                    target_xy = start_xy + dist * np.array([np.cos(angle), np.sin(angle)])
+                    if np.all(target_xy >= min_xy) and np.all(target_xy <= max_xy):
+                        break
+                else:
+                    target_xy = np.clip(target_xy, min_xy, max_xy)
+            else:
+                for _ in range(32):
+                    start_xy = self.np_random.uniform(min_xy, max_xy)
+                    target_xy = self.np_random.uniform(min_xy, max_xy)
+                    if np.linalg.norm(target_xy - start_xy) >= min_dist_threshold:
+                        break
+                else:  # pragma: no cover - only possible for unusually tiny maps
+                    start_xy, target_xy = min_xy, max_xy
             return (
                 Vec3(float(start_xy[0]), float(start_xy[1]), altitude),
                 Vec3(float(target_xy[0]), float(target_xy[1]), altitude),

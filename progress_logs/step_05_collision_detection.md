@@ -42,9 +42,10 @@
   - Collision condition: $d^2 \le (r_A + r_B)^2 = (2 r_{\text{uav}})^2$.
   - Canonical ordering: Enforces $id_A < id_B$ to guarantee identical incident reporting regardless of internal vector storage order.
 
-### 4. Deterministic Conflict Resolution & Rollback
-- Implemented `evaluateAndResolve` in `cpp/physics/CollisionSystem.cpp`:
-  - Evaluates static collisions first, followed by dynamic pairwise conflicts.
+### 4. Continuous World Boundary Enforcement & Conflict Resolution
+- Implemented `checkBoundaryCollision` and `evaluateAndResolve` in `cpp/physics/CollisionSystem.cpp`:
+  - Evaluates static building collisions, world boundary limits, followed by dynamic pairwise conflicts.
+  - Tests whether the swept displacement or terminal bounding sphere breaches the world limits $[x_{\min}, x_{\max}, y_{\min}, y_{\max}, z_{\min}, z_{\max}]$.
   - On collision detection:
     1. Rolls back the UAV position to its previous safe coordinate $\mathbf{p}_{\text{prev}}$.
     2. Zeroes linear velocity $\mathbf{v} = (0, 0, 0)$ and acceleration $\mathbf{a} = (0, 0, 0)$.
@@ -58,6 +59,7 @@
   - `test_uav_uav_head_on_collision`: Two UAVs flying directly toward each other; verifies detection of mutual collision, canonical ID ordering, rollback, and `EMERGENCY` state for both agents.
   - `test_uav_uav_safe_vertical_separation`: Two UAVs crossing paths with $5.0\text{m}$ vertical altitude separation ($> 2 r_{\text{uav}}$); confirms no conflict detected.
   - `test_deterministic_conflict_resolution`: Tests conflict evaluation under reversed array orders `[A, B]` vs `[B, A]`; confirms identical collision event counts and canonical ID pairs.
+  - `test_world_boundary_collision`: Steers a UAV outside world boundary bounds; verifies boundary intercept, rollback, `EMERGENCY` mode, and `WORLD_BOUNDARY` event logging.
 - Registered target `test_collision` and `CollisionTests` in `CMakeLists.txt`.
 
 ---
@@ -101,8 +103,9 @@ Test project /mnt/c/Users/deves/Desktop/AeroFleet/build
 [*] Running test_uav_uav_head_on_collision... PASSED
 [*] Running test_uav_uav_safe_vertical_separation... PASSED
 [*] Running test_deterministic_conflict_resolution... PASSED
+[*] Running test_world_boundary_collision... PASSED
 ========================================
-Summary: 5 Passed, 0 Failed
+Summary: 6 Passed, 0 Failed
 ========================================
 ```
 
