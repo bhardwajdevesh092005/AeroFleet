@@ -104,9 +104,9 @@ private:
     std::unordered_map<UAVId, UAVContext> m_contexts;
 
     void handleAssigned(UAVState& uav, UAVContext& ctx);
-    void handleFlyingToPickup(UAVState& uav, UAVContext& ctx, double dt);
+    void handleFlyingToPickup(UAVState& uav, UAVContext& ctx, const CityMap& map, double dt);
     void handlePickingUp(UAVState& uav, UAVContext& ctx, double dt, double currentTime);
-    void handleFlyingToDestination(UAVState& uav, UAVContext& ctx, double dt);
+    void handleFlyingToDestination(UAVState& uav, UAVContext& ctx, const CityMap& map, double dt);
     void handleDroppingOff(UAVState& uav, UAVContext& ctx, double dt, double currentTime, std::vector<DeliveryRequest>& outDelivered);
     void handleReturningToCharge(UAVState& uav, UAVContext& ctx, CityMap& map);
     void handleCharging(UAVState& uav, UAVContext& ctx, CityMap& map, double dt);

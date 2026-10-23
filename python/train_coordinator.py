@@ -48,7 +48,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--ent-coef", type=float, default=0.01)
     parser.add_argument("--max-episode-steps", type=int, default=300)
-    parser.add_argument("--use-onnx-nav", action="store_true", default=True)
+    parser.add_argument("--use-onnx-nav", action="store_true", default=False)
     return parser.parse_args()
 
 

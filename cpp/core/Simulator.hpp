@@ -17,6 +17,7 @@
 #include "control/WaypointController.hpp"
 #include "control/INavigationPolicy.hpp"
 #include "coordinator/HeuristicCoordinator.hpp"
+#include "control/SafetyLayer.hpp"
 #include "physics/CollisionSystem.hpp"
 #include "physics/Kinematics.hpp"
 #include "telemetry/Metrics.hpp"
@@ -117,6 +118,8 @@ public:
     [[nodiscard]] bool getAutoCoordinatorDispatch() const noexcept { return m_autoCoordinatorDispatch; }
 
     bool dispatchRequest(UAVId uavId, RequestId requestId);
+    [[nodiscard]] bool isEnergyFeasible(UAVId uavId, RequestId requestId) const;
+    [[nodiscard]] double computeDispatchScore(UAVId uavId, RequestId requestId) const;
     [[nodiscard]] const std::vector<DeliveryRequest>& getPendingRequests() const noexcept { return m_pendingRequests; }
     [[nodiscard]] const std::vector<DeliveryRequest>& getDeliveredRequests() const noexcept { return m_deliveredRequests; }
 
@@ -134,6 +137,7 @@ private:
     RequestGenerator m_requestGen;
     WaypointController m_navigator;
     HeuristicCoordinator m_coordinator;
+    SafetyLayer m_safetyLayer;
     CollisionSystem m_collisions;
     KinematicsIntegrator m_integrator;
     SimulationClock m_clock;

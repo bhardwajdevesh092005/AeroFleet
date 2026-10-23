@@ -184,13 +184,13 @@ void FleetManager::step(
                 handleAssigned(uav, ctx);
                 break;
             case UAVMode::FLYING_TO_PICKUP:
-                handleFlyingToPickup(uav, ctx, dt);
+                handleFlyingToPickup(uav, ctx, map, dt);
                 break;
             case UAVMode::PICKING_UP:
                 handlePickingUp(uav, ctx, dt, currentTime);
                 break;
             case UAVMode::FLYING_TO_DESTINATION:
-                handleFlyingToDestination(uav, ctx, dt);
+                handleFlyingToDestination(uav, ctx, map, dt);
                 break;
             case UAVMode::DROPPING_OFF:
                 handleDroppingOff(uav, ctx, dt, currentTime, outDeliveredRequests);
@@ -225,14 +225,26 @@ void FleetManager::handleAssigned(UAVState& uav, UAVContext& ctx) {
     uav.isGrounded = false;
 }
 
-void FleetManager::handleFlyingToPickup(UAVState& uav, UAVContext& ctx, double /*dt*/) {
+void FleetManager::handleFlyingToPickup(UAVState& uav, UAVContext& ctx, const CityMap& map, double /*dt*/) {
     if (uav.position.z < 10.0) {
         // Maintain vertical climb corridor to clear ground charging station
         uav.targetWaypoint = Vec3(ctx.homeBasePosition.x, ctx.homeBasePosition.y, 15.0);
         return;
     }
 
-    uav.targetWaypoint = ctx.activeRequest.pickupLocation;
+    const Vec3& pickup = ctx.activeRequest.pickupLocation;
+    double maxBuildingHeight = 0.0;
+    for (const auto& b : map.buildings) {
+        maxBuildingHeight = std::max(maxBuildingHeight, b.bounds.maxPoint.z);
+    }
+
+    const double horizDist = std::hypot(uav.position.x - pickup.x, uav.position.y - pickup.y);
+    if (!map.buildings.empty() && horizDist > 20.0) {
+        const double cruiseAltitude = std::min(map.worldMax.z - 5.0, maxBuildingHeight + 5.0);
+        uav.targetWaypoint = Vec3(pickup.x, pickup.y, cruiseAltitude);
+    } else {
+        uav.targetWaypoint = pickup;
+    }
 
     double dist = uav.position.distance(ctx.activeRequest.pickupLocation);
     if (dist <= 3.0) {
@@ -257,7 +269,21 @@ void FleetManager::handlePickingUp(UAVState& uav, UAVContext& ctx, double dt, do
     }
 }
 
-void FleetManager::handleFlyingToDestination(UAVState& uav, UAVContext& ctx, double /*dt*/) {
+void FleetManager::handleFlyingToDestination(UAVState& uav, UAVContext& ctx, const CityMap& map, double /*dt*/) {
+    const Vec3& dropoff = ctx.activeRequest.dropoffLocation;
+    double maxBuildingHeight = 0.0;
+    for (const auto& b : map.buildings) {
+        maxBuildingHeight = std::max(maxBuildingHeight, b.bounds.maxPoint.z);
+    }
+
+    const double horizDist = std::hypot(uav.position.x - dropoff.x, uav.position.y - dropoff.y);
+    if (!map.buildings.empty() && horizDist > 20.0) {
+        const double cruiseAltitude = std::min(map.worldMax.z - 5.0, maxBuildingHeight + 5.0);
+        uav.targetWaypoint = Vec3(dropoff.x, dropoff.y, cruiseAltitude);
+    } else {
+        uav.targetWaypoint = dropoff;
+    }
+
     double dist = uav.position.distance(ctx.activeRequest.dropoffLocation);
     if (dist <= 3.0) {
         uav.mode = UAVMode::DROPPING_OFF;
@@ -311,7 +337,20 @@ void FleetManager::handleReturningToCharge(UAVState& uav, UAVContext& ctx, CityM
     }
 
     if (targetStation) {
-        uav.targetWaypoint = targetStation->position;
+        double maxBuildingHeight = 0.0;
+        for (const auto& b : map.buildings) {
+            maxBuildingHeight = std::max(maxBuildingHeight, b.bounds.maxPoint.z);
+        }
+
+        const double horizDist = std::hypot(uav.position.x - targetStation->position.x,
+                                            uav.position.y - targetStation->position.y);
+        if (!map.buildings.empty() && horizDist > 20.0) {
+            const double cruiseAltitude = std::min(map.worldMax.z - 5.0, maxBuildingHeight + 5.0);
+            uav.targetWaypoint = Vec3(targetStation->position.x, targetStation->position.y, cruiseAltitude);
+        } else {
+            uav.targetWaypoint = targetStation->position;
+        }
+
         if (m_batteryModel.isInDockingRange(uav, *targetStation) && uav.speed() <= 2.0) {
             if (m_batteryModel.dock(uav, *targetStation)) {
                 uav.mode = UAVMode::CHARGING;

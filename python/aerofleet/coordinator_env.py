@@ -40,7 +40,7 @@ class AeroFleetCoordinatorEnv(gym.Env):
     def __init__(
         self,
         config_path: str = "config/simulation.json",
-        use_onnx_nav: bool = True,
+        use_onnx_nav: bool = False,
         decision_interval: float = 1.0,
         max_steps: int = 300,
         model_path: str = "models/navigation/nav_policy.onnx",
@@ -148,6 +148,8 @@ class AeroFleetCoordinatorEnv(gym.Env):
             for uav_idx in range(num_uavs):
                 uav = uavs[uav_idx]
                 if uav.mode == UAVMode.IDLE and uav.battery_percent > self._min_battery_dispatch_percent:
+                    if hasattr(self._sim, "is_energy_feasible") and not self._sim.is_energy_feasible(uav_idx, req.id):
+                        continue
                     action_idx = 1 + req_idx * FLEET_SIZE + uav_idx
                     mask[action_idx] = True
 
@@ -225,11 +227,14 @@ class AeroFleetCoordinatorEnv(gym.Env):
                         proximity_bonus = max(0.0, 1.0 - dist / 500.0)
                     else:
                         proximity_bonus = 0.0
-                    reward += self._w_assign_bonus + proximity_bonus
+
+                    slack = max(0.0, (target_req.deadline - self._sim.simulated_time) / 300.0)
+                    urgency_bonus = max(0.0, 1.0 - slack)
+                    reward += self._w_assign_bonus + proximity_bonus + 0.5 * urgency_bonus
                 else:
-                    reward -= 0.5  # Invalid dispatch
+                    reward -= 1.0  # Invalid dispatch
             else:
-                reward -= 0.5
+                reward -= 1.0
 
         # Snapshot before physics step to compute deltas
         snap_before = self._sim.get_snapshot()

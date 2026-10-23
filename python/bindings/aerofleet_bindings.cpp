@@ -340,6 +340,8 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
         .def("set_auto_coordinator_dispatch", &Simulator::setAutoCoordinatorDispatch, py::arg("enable"))
         .def("get_auto_coordinator_dispatch", &Simulator::getAutoCoordinatorDispatch)
         .def("dispatch_request", &Simulator::dispatchRequest, py::arg("uav_id"), py::arg("request_id"))
+        .def("is_energy_feasible", &Simulator::isEnergyFeasible, py::arg("uav_id"), py::arg("request_id"))
+        .def("compute_dispatch_score", &Simulator::computeDispatchScore, py::arg("uav_id"), py::arg("request_id"))
         .def("get_pending_requests", &Simulator::getPendingRequests)
         .def("get_delivered_requests", &Simulator::getDeliveredRequests)
         .def("step_coordinator", [](Simulator& self, double intervalSeconds) {

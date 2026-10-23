@@ -29,9 +29,6 @@ public:
 
     [[nodiscard]] const HeuristicCoordinatorConfig& getConfig() const noexcept { return m_config; }
 
-private:
-    HeuristicCoordinatorConfig m_config;
-
     [[nodiscard]] bool energyFeasible(
         const UAVState& uav,
         const DeliveryRequest& request,
@@ -44,6 +41,9 @@ private:
         double currentTime,
         const BatteryModel& battery
     ) const noexcept;
+
+private:
+    HeuristicCoordinatorConfig m_config;
 };
 
 } // namespace aerofleet

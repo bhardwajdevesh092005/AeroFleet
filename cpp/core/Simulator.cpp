@@ -91,6 +91,7 @@ Simulator::Simulator(const SimulationConfig& config)
           1.5, 0.2
       }),
       m_coordinator(),
+      m_safetyLayer(SafetyLayerConfig{1.5, 0.05, m_config.fleet.uavRadius, m_config.world.safetyMargin, m_config.fleet.maxVerticalSpeed}),
       m_collisions(m_config.fleet.uavRadius),
       m_integrator(KinematicsConfig::fromConfig(m_config.fleet, m_config.world)),
       m_clock(m_config.simulation.dtPhysics, 1.0),
@@ -244,6 +245,7 @@ void Simulator::integratePhysicsSubStep(double dt, const std::vector<VelocityCom
                 cmd = m_navigator.applyTrafficAvoidance(uav, cmd, trafficSnapshot);
             } else {
                 cmd = m_navigator.computeActionWithTraffic(uav, m_map, trafficSnapshot, dt);
+                cmd = m_safetyLayer.filterAction(uav, m_map, cmd, dt);
             }
         }
         m_integrator.stepVelocityCommand(uav, cmd, dt);
@@ -599,6 +601,22 @@ bool Simulator::dispatchRequest(UAVId uavId, RequestId requestId) {
         return true;
     }
     return false;
+}
+
+bool Simulator::isEnergyFeasible(UAVId uavId, RequestId requestId) const {
+    if (uavId < 0 || static_cast<size_t>(uavId) >= m_fleet.size()) return false;
+    auto it = std::find_if(m_pendingRequests.begin(), m_pendingRequests.end(),
+                           [requestId](const DeliveryRequest& r) { return r.id == requestId; });
+    if (it == m_pendingRequests.end()) return false;
+    return m_coordinator.energyFeasible(m_fleet.getUAV(uavId), *it, m_map, m_fleet.getBatteryModel());
+}
+
+double Simulator::computeDispatchScore(UAVId uavId, RequestId requestId) const {
+    if (uavId < 0 || static_cast<size_t>(uavId) >= m_fleet.size()) return std::numeric_limits<double>::infinity();
+    auto it = std::find_if(m_pendingRequests.begin(), m_pendingRequests.end(),
+                           [requestId](const DeliveryRequest& r) { return r.id == requestId; });
+    if (it == m_pendingRequests.end()) return std::numeric_limits<double>::infinity();
+    return m_coordinator.score(m_fleet.getUAV(uavId), *it, m_clock.now(), m_fleet.getBatteryModel());
 }
 
 StepResult Simulator::stepCoordinator(double intervalSeconds) {

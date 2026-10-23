@@ -1,0 +1,8 @@
+CompileFlags:
+  Add:
+    - -Icpp
+    - -Ithird_party/onnxruntime/include
+    - -Ibuild/_deps/raylib-src/src
+    - -std=c++20
+    - -DGRAPHICS_API_OPENGL_33
+    - -DPLATFORM_DESKTOP
