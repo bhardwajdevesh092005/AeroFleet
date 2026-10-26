@@ -213,8 +213,8 @@ void FleetManager::step(
                 handleCharging(uav, ctx, map, dt);
                 break;
             case UAVMode::IDLE:
-                // If idle and battery dropped below reserve, return to charge
-                if (m_batteryModel.isReserve(uav.batteryPercent)) {
+                // Proactive battery management: if idle and battery <= 25% or below reserve, return to charge
+                if (uav.batteryPercent <= 25.0 || m_batteryModel.isReserve(uav.batteryPercent)) {
                     uav.mode = UAVMode::RETURNING_TO_CHARGE;
                 }
                 break;
@@ -268,14 +268,20 @@ void FleetManager::handleFlyingToPickup(UAVState& uav, UAVContext& ctx, const Ci
     }
 
     const Vec3& pickup = ctx.activeRequest.pickupLocation;
-    double maxBuildingHeight = 0.0;
-    for (const auto& b : map.buildings) {
-        maxBuildingHeight = std::max(maxBuildingHeight, b.bounds.maxPoint.z);
-    }
-
     const double horizDist = std::hypot(uav.position.x - pickup.x, uav.position.y - pickup.y);
     if (!map.buildings.empty() && horizDist > 20.0) {
-        const double cruiseAltitude = std::min(map.worldMax.z - 5.0, maxBuildingHeight + 5.0);
+        double localMaxHeight = 35.0;
+        const double minX = std::min(uav.position.x, pickup.x) - 15.0;
+        const double maxX = std::max(uav.position.x, pickup.x) + 15.0;
+        const double minY = std::min(uav.position.y, pickup.y) - 15.0;
+        const double maxY = std::max(uav.position.y, pickup.y) + 15.0;
+        for (const auto& b : map.buildings) {
+            if (b.bounds.maxPoint.x >= minX && b.bounds.minPoint.x <= maxX &&
+                b.bounds.maxPoint.y >= minY && b.bounds.minPoint.y <= maxY) {
+                localMaxHeight = std::max(localMaxHeight, b.bounds.maxPoint.z + 5.0);
+            }
+        }
+        const double cruiseAltitude = std::min(map.worldMax.z - 5.0, localMaxHeight);
         uav.targetWaypoint = Vec3(pickup.x, pickup.y, cruiseAltitude);
     } else {
         uav.targetWaypoint = pickup;
@@ -315,7 +321,7 @@ void FleetManager::handleFlyingToDestination(UAVState& uav, UAVContext& ctx, con
         double dist = uav.position.distance(uav.targetWaypoint);
         if (dist <= 3.0) {
             uav.velocity = Vec3(0.0, 0.0, 0.0);
-            if (m_batteryModel.isReserve(uav.batteryPercent)) {
+            if (uav.batteryPercent <= 25.0 || m_batteryModel.isReserve(uav.batteryPercent)) {
                 uav.mode = UAVMode::RETURNING_TO_CHARGE;
             } else {
                 uav.mode = UAVMode::IDLE;
@@ -326,14 +332,20 @@ void FleetManager::handleFlyingToDestination(UAVState& uav, UAVContext& ctx, con
     }
 
     const Vec3& dropoff = ctx.activeRequest.dropoffLocation;
-    double maxBuildingHeight = 0.0;
-    for (const auto& b : map.buildings) {
-        maxBuildingHeight = std::max(maxBuildingHeight, b.bounds.maxPoint.z);
-    }
-
     const double horizDist = std::hypot(uav.position.x - dropoff.x, uav.position.y - dropoff.y);
     if (!map.buildings.empty() && horizDist > 20.0) {
-        const double cruiseAltitude = std::min(map.worldMax.z - 5.0, maxBuildingHeight + 5.0);
+        double localMaxHeight = 35.0;
+        const double minX = std::min(uav.position.x, dropoff.x) - 15.0;
+        const double maxX = std::max(uav.position.x, dropoff.x) + 15.0;
+        const double minY = std::min(uav.position.y, dropoff.y) - 15.0;
+        const double maxY = std::max(uav.position.y, dropoff.y) + 15.0;
+        for (const auto& b : map.buildings) {
+            if (b.bounds.maxPoint.x >= minX && b.bounds.minPoint.x <= maxX &&
+                b.bounds.maxPoint.y >= minY && b.bounds.minPoint.y <= maxY) {
+                localMaxHeight = std::max(localMaxHeight, b.bounds.maxPoint.z + 5.0);
+            }
+        }
+        const double cruiseAltitude = std::min(map.worldMax.z - 5.0, localMaxHeight);
         uav.targetWaypoint = Vec3(dropoff.x, dropoff.y, cruiseAltitude);
     } else {
         uav.targetWaypoint = dropoff;
@@ -366,7 +378,7 @@ void FleetManager::handleDroppingOff(
         ctx.assignedRequestId = -1;
         ctx.dwellTimer = 0.0;
 
-        if (m_batteryModel.isReserve(uav.batteryPercent)) {
+        if (uav.batteryPercent <= 25.0 || m_batteryModel.isReserve(uav.batteryPercent)) {
             uav.mode = UAVMode::RETURNING_TO_CHARGE;
         } else {
             uav.mode = UAVMode::IDLE;
@@ -394,16 +406,23 @@ void FleetManager::handleReturningToCharge(UAVState& uav, UAVContext& ctx, CityM
     }
 
     if (targetStation) {
-        double maxBuildingHeight = 0.0;
+        double localMaxHeight = 35.0; // Standard transit clearance
+        const double minX = std::min(uav.position.x, targetStation->position.x) - 15.0;
+        const double maxX = std::max(uav.position.x, targetStation->position.x) + 15.0;
+        const double minY = std::min(uav.position.y, targetStation->position.y) - 15.0;
+        const double maxY = std::max(uav.position.y, targetStation->position.y) + 15.0;
         for (const auto& b : map.buildings) {
-            maxBuildingHeight = std::max(maxBuildingHeight, b.bounds.maxPoint.z);
+            if (b.bounds.maxPoint.x >= minX && b.bounds.minPoint.x <= maxX &&
+                b.bounds.maxPoint.y >= minY && b.bounds.minPoint.y <= maxY) {
+                localMaxHeight = std::max(localMaxHeight, b.bounds.maxPoint.z + 5.0);
+            }
         }
+        const double rthAltitude = std::min(map.worldMax.z - 5.0, localMaxHeight);
 
         const double horizDist = std::hypot(uav.position.x - targetStation->position.x,
                                             uav.position.y - targetStation->position.y);
-        if (!map.buildings.empty() && horizDist > 20.0) {
-            const double cruiseAltitude = std::min(map.worldMax.z - 5.0, maxBuildingHeight + 5.0);
-            uav.targetWaypoint = Vec3(targetStation->position.x, targetStation->position.y, cruiseAltitude);
+        if (horizDist > 15.0) {
+            uav.targetWaypoint = Vec3(targetStation->position.x, targetStation->position.y, rthAltitude);
         } else {
             uav.targetWaypoint = targetStation->position;
         }

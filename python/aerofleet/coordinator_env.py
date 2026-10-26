@@ -50,7 +50,9 @@ class AeroFleetCoordinatorEnv(gym.Env):
         w_wait: float = 0.001,
         w_queue: float = 0.05,
         w_assign_bonus: float = 0.5,
-        min_battery_dispatch_percent: float = 20.0,
+        w_emergency: float = 30.0,
+        w_charging_bonus: float = 2.0,
+        min_battery_dispatch_percent: float = 25.0,
     ) -> None:
         super().__init__()
 
@@ -66,6 +68,8 @@ class AeroFleetCoordinatorEnv(gym.Env):
         self._w_wait = w_wait
         self._w_queue = w_queue
         self._w_assign_bonus = w_assign_bonus
+        self._w_emergency = w_emergency
+        self._w_charging_bonus = w_charging_bonus
         self._min_battery_dispatch_percent = min_battery_dispatch_percent
 
         self._sim = Simulator(self._config_path)
@@ -242,6 +246,7 @@ class AeroFleetCoordinatorEnv(gym.Env):
         snap_before = self._sim.get_snapshot()
         delivered_before = snap_before.metrics.total_delivered
         expired_before = snap_before.metrics.total_expired
+        emergencies_before = sum(1 for u in snap_before.uavs if u.mode == UAVMode.EMERGENCY)
 
         # Advance simulation by decision interval
         self._sim.step_coordinator(self._decision_interval)
@@ -250,13 +255,30 @@ class AeroFleetCoordinatorEnv(gym.Env):
         snap_after = self._sim.get_snapshot()
         delta_delivered = snap_after.metrics.total_delivered - delivered_before
         delta_expired = snap_after.metrics.total_expired - expired_before
+        emergencies_after = sum(1 for u in snap_after.uavs if u.mode == UAVMode.EMERGENCY)
+        delta_emergencies = max(0, emergencies_after - emergencies_before)
+
+        # Active battery charging replenishment bonus
+        charged_drones = sum(
+            1 for ub, ua in zip(snap_before.uavs, snap_after.uavs)
+            if ub.mode == UAVMode.CHARGING and ua.battery_percent >= 99.0
+        )
 
         pending_after = self._sim.get_pending_requests()
         total_wait_time = sum(self._sim.simulated_time - r.creation_time for r in pending_after)
 
+        # Critical battery prevention penalty: airborne UAV running below 15%
+        dangerously_low = sum(
+            1 for u in snap_after.uavs
+            if u.mode not in (UAVMode.CHARGING, UAVMode.IDLE) and u.battery_percent < 15.0
+        )
+
         # Weighted reward composition
         reward += self._w_delivered * delta_delivered
         reward -= self._w_expired * delta_expired
+        reward -= self._w_emergency * delta_emergencies
+        reward -= 2.0 * dangerously_low
+        reward += self._w_charging_bonus * charged_drones
         reward -= self._w_wait * total_wait_time
         reward -= self._w_queue * len(pending_after)
 
@@ -269,8 +291,11 @@ class AeroFleetCoordinatorEnv(gym.Env):
             "assignment_success": assignment_success,
             "delta_delivered": delta_delivered,
             "delta_expired": delta_expired,
+            "delta_emergencies": delta_emergencies,
             "total_delivered": snap_after.metrics.total_delivered,
             "total_expired": snap_after.metrics.total_expired,
+            "total_emergencies": emergencies_after,
+            "charged_drones": charged_drones,
             "pending_count": len(pending_after),
             "success_rate": snap_after.metrics.delivery_success_rate,
             "mean_latency": snap_after.metrics.average_delivery_duration,

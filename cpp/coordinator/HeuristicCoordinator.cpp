@@ -36,26 +36,44 @@ bool HeuristicCoordinator::energyFeasible(
     if (map.chargingStations.empty()) return false;
 
     const double speed = m_config.nominalSpeed;
-    const double toPickup = uav.position.distance(request.pickupLocation);
-    const double loadedFlight = request.pickupLocation.distance(request.dropoffLocation);
+    const double detourFactor = 1.25;
+
+    const double toPickup = uav.position.distance(request.pickupLocation) * detourFactor;
+    const double loadedFlight = request.pickupLocation.distance(request.dropoffLocation) * detourFactor;
     double returnDistance = std::numeric_limits<double>::infinity();
     for (const auto& charger : map.chargingStations) {
         returnDistance = std::min(returnDistance, request.dropoffLocation.distance(charger.position));
     }
+    returnDistance *= detourFactor;
 
     const Vec3 cruiseVelocity(speed, 0.0, 0.0);
     const double outboundPower = battery.computePowerWatts(cruiseVelocity, 0.0);
     const double loadedPower = battery.computePowerWatts(cruiseVelocity, request.payloadMass);
     const double returnPower = battery.computePowerWatts(cruiseVelocity, 0.0);
-    const double requiredJoules = outboundPower * (toPickup / speed) +
-        loadedPower * (loadedFlight / speed) + returnPower * (returnDistance / speed);
+
+    const double flightJoules = outboundPower * (toPickup / speed) +
+                                loadedPower * (loadedFlight / speed) +
+                                returnPower * (returnDistance / speed);
+
+    const double hoverUnloaded = battery.computePowerWatts(Vec3(0.0, 0.0, 0.0), 0.0);
+    const double hoverLoaded = battery.computePowerWatts(Vec3(0.0, 0.0, 0.0), request.payloadMass);
+    const double dwellJoules = hoverUnloaded * 3.0 + hoverLoaded * 3.0;
+
+    const double cClimb = battery.getConfig().climbPenaltyCoefficient;
+    const double transitAlt = 35.0;
+    const double climb1 = std::max(0.0, transitAlt - uav.position.z);
+    const double climb2 = std::max(0.0, transitAlt - request.pickupLocation.z);
+    const double climbJoules = cClimb * (climb1 + climb2);
+
+    const double dischargeMult = std::max(1.0, battery.getDischargeMultiplier());
+    const double totalRequiredJoules = (flightJoules + dwellJoules + climbJoules) * dischargeMult;
 
     const auto& batteryConfig = battery.getConfig();
     const double capacity = batteryConfig.totalCapacityJoules();
-    if (!std::isfinite(requiredJoules) || capacity <= 0.0) return false;
-    const double requiredPercent = 100.0 * requiredJoules / capacity;
+    if (!std::isfinite(totalRequiredJoules) || capacity <= 0.0) return false;
+    const double requiredPercent = 100.0 * totalRequiredJoules / capacity;
     const double reserve = std::max(m_config.reserveMarginPercent, batteryConfig.reservePercent);
-    return uav.batteryPercent - requiredPercent >= reserve;
+    return (uav.batteryPercent - requiredPercent) >= reserve;
 }
 
 double HeuristicCoordinator::score(
