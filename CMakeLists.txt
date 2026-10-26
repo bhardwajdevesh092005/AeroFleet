@@ -248,6 +248,14 @@ set_tests_properties(ONNXRuntimeTests PROPERTIES
     ENVIRONMENT "LD_LIBRARY_PATH=${ONNXRUNTIME_ROOT}/lib:$ENV{LD_LIBRARY_PATH}"
 )
 
+# Battery Stress Tests
+add_executable(test_battery_stress tests/test_battery_stress.cpp)
+target_link_libraries(test_battery_stress PRIVATE AeroFleetCore)
+add_test(NAME BatteryStressTests COMMAND test_battery_stress)
+set_tests_properties(BatteryStressTests PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+)
+
 # Optional Python pybind11 module. Prefer installed CMake packages, then use
 # the hermetic Python/pybind11 development files kept under third_party/.  The
 # latter matters on course/lab machines where the Python interpreter exists
