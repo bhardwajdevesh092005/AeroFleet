@@ -151,18 +151,7 @@ void CameraController::update(double dt, const WorldSnapshot& snapshot) {
 void CameraController::handleInput(double dt) {
     if (!IsWindowReady()) return;
 
-    // 1. Mode cycling hotkeys
-    if (IsKeyPressed(KEY_C)) {
-        cycleMode();
-    }
-    if (IsKeyPressed(KEY_O)) {
-        toggleCinematicAutoOrbit();
-    }
-    if (IsKeyPressed(KEY_TAB)) {
-        m_chaseTargetId = (m_chaseTargetId + 1) % 10;
-    }
-
-    // 2. Mouse interactions for orbit mode
+    // Mouse interactions for orbit mode
     if (m_mode == CameraMode::ORBIT) {
         if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) || IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)) {
             const Vector2 delta = GetMouseDelta();

@@ -23,6 +23,7 @@
 #include "telemetry/Logger.hpp"
 #include "control/ONNXNavigationPolicy.hpp"
 #include "control/SafetyLayer.hpp"
+#include "coordinator/ONNXCoordinatorPolicy.hpp"
 #include <fstream>
 #include <filesystem>
 #include <memory>
@@ -191,11 +192,11 @@ void setupShowcaseScenarios(
         u.activeRequestId = 103;
     }
 
-    // UAV 4: LOW BATTERY RTH TRIGGERED! Battery at 18.0% (<= 20% reserve threshold)
+    // UAV 4: Returning to charge demonstration, 55% battery
     {
         auto& u = fleet.getUAV(4);
         u.mode = UAVMode::RETURNING_TO_CHARGE;
-        u.batteryPercent = 18.0;
+        u.batteryPercent = 55.0;
         u.payloadMass = 0.0;
         u.activeRequestId = -1;
         u.position = makeClearPos(Vec3(210.0, -190.0, 32.0));
@@ -221,11 +222,11 @@ void setupShowcaseScenarios(
         ctx.targetChargerId = map.chargingStations[1].id;
     }
 
-    // UAV 6: CRITICAL BATTERY RUSHING TO RECHARGE! 12.0% battery
+    // UAV 6: En-route to charge, 65% battery
     {
         auto& u = fleet.getUAV(6);
         u.mode = UAVMode::RETURNING_TO_CHARGE;
-        u.batteryPercent = 12.0;
+        u.batteryPercent = 65.0;
         u.payloadMass = 0.0;
         u.activeRequestId = -1;
         u.position = makeClearPos(Vec3(-180.0, -150.0, 26.0));
@@ -334,7 +335,10 @@ int main(int argc, char* argv[]) {
     std::string normPath = "models/navigation/normalization.json";
     bool useSafety = true;
 
-    std::string scenario = "all";
+    bool useOnnxCoord = true;
+    std::string coordPolicyPath = "models/coordinator/coord_policy.onnx";
+
+    std::string scenario = "standard";
     double batteryDrain = -1.0;
 
     for (int i = 1; i < argc; ++i) {
@@ -364,6 +368,13 @@ int main(int argc, char* argv[]) {
             useOnnxNav = true;
         } else if (arg == "--norm-path" && i + 1 < argc) {
             normPath = argv[++i];
+        } else if (arg == "--onnx-coord") {
+            useOnnxCoord = true;
+        } else if (arg == "--heuristic-coord") {
+            useOnnxCoord = false;
+        } else if (arg == "--coord-policy" && i + 1 < argc) {
+            coordPolicyPath = argv[++i];
+            useOnnxCoord = true;
         } else if (arg == "--no-safety") {
             useSafety = false;
         } else if (arg == "--log-events") {
@@ -440,13 +451,30 @@ int main(int argc, char* argv[]) {
         } catch (const std::exception& ex) {
             std::cerr << "[Warning] Failed to initialize ONNX Navigation Policy: " << ex.what() << "\n";
             std::cerr << "          Falling back to Heuristic APF Navigation.\n";
-            navPolicy = nullptr;
         }
-    } else {
-        std::cout << "[System] Navigation Engine: Baseline Heuristic APF\n";
     }
 
-    HeuristicCoordinator coordinator;
+    std::shared_ptr<ICoordinator> coordinator;
+    if (useOnnxCoord) {
+        std::string resolvedCoordModel = resolveConfigPath(coordPolicyPath);
+        if (std::filesystem::exists(resolvedCoordModel)) {
+            try {
+                coordinator = std::make_shared<ONNXCoordinatorPolicy>(resolvedCoordModel);
+                std::cout << "[System] Coordinator Engine: Deep RL MaskablePPO Policy (" << resolvedCoordModel << ")\n";
+            } catch (const std::exception& ex) {
+                std::cerr << "[Warning] Failed to initialize ONNX Coordinator: " << ex.what() << "\n";
+                std::cerr << "          Falling back to Heuristic Greedy Coordinator.\n";
+                coordinator = std::make_shared<HeuristicCoordinator>();
+            }
+        } else {
+            std::cout << "[System] Coordinator Engine: Baseline Heuristic Greedy (Model not found at " << resolvedCoordModel << ")\n";
+            coordinator = std::make_shared<HeuristicCoordinator>();
+        }
+    } else {
+        std::cout << "[System] Coordinator Engine: Baseline Heuristic Greedy\n";
+        coordinator = std::make_shared<HeuristicCoordinator>();
+    }
+
     CollisionSystem collisions(config.fleet.uavRadius);
     KinematicsIntegrator integrator(KinematicsConfig::fromConfig(config.fleet, config.world));
     SimulationClock clock(config.simulation.dtPhysics, timeScale);
@@ -568,7 +596,9 @@ int main(int argc, char* argv[]) {
 
             // 2. Dispatch coordinator at coordinator rate (e.g. 1 Hz)
             if (currentTime - lastCoordinatorDispatchTime >= config.simulation.dtCoordinator) {
-                coordinator.dispatch(fleet, pendingRequests, map, currentTime);
+                if (coordinator) {
+                    coordinator->dispatch(fleet, pendingRequests, map, currentTime);
+                }
                 for (const auto& req : pendingRequests) {
                     if (req.status == RequestStatus::ASSIGNED && logEvents) {
                         logger.log(currentTime, SimulationEventType::REQUEST_ASSIGNED,
@@ -758,14 +788,47 @@ int main(int argc, char* argv[]) {
                         renderer.setSelectedUav(target);
                         camera.setChaseTarget(target);
                         camera.setMode(aerofleet::CameraMode::CHASE);
-                        renderer.addToast("Chasing UAV #" + std::to_string(target), Color{56, 189, 248, 255});
+                        renderer.addToast("Chasing UAV #" + std::to_string(target + 1), Color{56, 189, 248, 255});
                     }
                 }
             }
             if (IsKeyPressed(KEY_ZERO)) {
+                if (fleet.size() >= 10) {
+                    UAVId target = 9; // UAV #10 (0-indexed 9)
+                    renderer.setSelectedUav(target);
+                    camera.setChaseTarget(target);
+                    camera.setMode(aerofleet::CameraMode::CHASE);
+                    renderer.addToast("Chasing UAV #10", Color{56, 189, 248, 255});
+                } else {
+                    camera.setMode(aerofleet::CameraMode::ORBIT);
+                    camera.setTarget(Vec3(0.0, 0.0, 15.0));
+                    renderer.addToast("Camera: ORBIT (Downtown Center)", Color{56, 189, 248, 255});
+                }
+            }
+            if (IsKeyPressed(KEY_O)) {
                 camera.setMode(aerofleet::CameraMode::ORBIT);
                 camera.setTarget(Vec3(0.0, 0.0, 15.0));
                 renderer.addToast("Camera: ORBIT (Downtown Center)", Color{56, 189, 248, 255});
+            }
+            if (IsKeyPressed(KEY_TAB) || IsKeyPressed(KEY_N)) {
+                if (fleet.size() > 0) {
+                    UAVId curr = renderer.getSelectedUav();
+                    UAVId next = static_cast<UAVId>((curr + 1) % fleet.size());
+                    renderer.setSelectedUav(next);
+                    camera.setChaseTarget(next);
+                    camera.setMode(aerofleet::CameraMode::CHASE);
+                    renderer.addToast("Chasing UAV #" + std::to_string(next + 1), Color{56, 189, 248, 255});
+                }
+            }
+            if (IsKeyPressed(KEY_P)) {
+                if (fleet.size() > 0) {
+                    UAVId curr = renderer.getSelectedUav();
+                    UAVId prev = static_cast<UAVId>((curr - 1 + fleet.size()) % fleet.size());
+                    renderer.setSelectedUav(prev);
+                    camera.setChaseTarget(prev);
+                    camera.setMode(aerofleet::CameraMode::CHASE);
+                    renderer.addToast("Chasing UAV #" + std::to_string(prev + 1), Color{56, 189, 248, 255});
+                }
             }
             WorldSnapshot renderSnapshot = WorldSnapshot::interpolate(prevSnapshot, currSnapshot, clock.getAlpha());
             renderer.draw(renderSnapshot, map, camera);

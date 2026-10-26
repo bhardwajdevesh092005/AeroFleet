@@ -133,15 +133,20 @@ CityMap WorldGenerator::generate(
         if (c < static_cast<int32_t>(map.stores.size())) {
             // Place near corresponding store hub
             const Vec3& storePos = map.stores[static_cast<size_t>(c)].position;
-            const Vec3 offset(15.0, 0.0, 0.0);
+            const Vec3 offset(18.0, 0.0, 0.0);
             if (map.isLocationClear(storePos + offset, 4.0)) {
                 stationPos = storePos + offset;
                 placed = true;
             }
         }
         if (!placed) {
+            // Distribute stations across the 4 city sectors
+            const double quadSignX = (c % 2 == 0) ? 1.0 : -1.0;
+            const double quadSignY = ((c / 2) % 2 == 0) ? 1.0 : -1.0;
+            std::uniform_real_distribution<double> sectorX(margin * 0.5, settings.xMax - margin);
+            std::uniform_real_distribution<double> sectorY(margin * 0.5, settings.yMax - margin);
             for (int retry = 0; retry < 500; ++retry) {
-                stationPos = Vec3(xCoordDist(rng), yCoordDist(rng), settings.zMin);
+                stationPos = Vec3(quadSignX * sectorX(rng), quadSignY * sectorY(rng), settings.zMin);
                 if (map.isLocationClear(stationPos, 5.0)) {
                     placed = true;
                     break;
@@ -149,13 +154,13 @@ CityMap WorldGenerator::generate(
             }
         }
         if (!placed) {
-            stationPos = Vec3(20.0 * c, 20.0 * c, settings.zMin);
+            stationPos = Vec3(40.0 * (c - 5), 40.0 * (c - 5), settings.zMin);
         }
         map.chargingStations.push_back(ChargingStation{
             stationIdCounter,
             "Charging Dock " + std::to_string(stationIdCounter),
             stationPos,
-            4, // 4 UAV capacity
+            8, // 8 UAV capacity per station
             0  // 0 occupied initially
         });
         stationIdCounter++;

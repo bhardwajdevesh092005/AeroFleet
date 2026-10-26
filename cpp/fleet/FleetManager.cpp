@@ -35,13 +35,9 @@ void FleetManager::initialize(
         Vec3 spawnPos(0.0, 0.0, defaultAltitude);
         if (!map.chargingStations.empty()) {
             size_t stationIdx = i % map.chargingStations.size();
-            size_t slotIdx = i / map.chargingStations.size();
             spawnPos = map.chargingStations[stationIdx].position;
-            if (slotIdx > 0) {
-                const double angle = static_cast<double>(slotIdx) * (MathUtils::PI * 0.5);
-                spawnPos.x += 3.5 * std::cos(angle);
-                spawnPos.y += 3.5 * std::sin(angle);
-            }
+            // Ground level docking pad
+            spawnPos.z = map.chargingStations[stationIdx].position.z;
         }
 
         UAVState uav(static_cast<UAVId>(i), spawnPos, 0.0);
@@ -50,7 +46,7 @@ void FleetManager::initialize(
         uav.mode = UAVMode::IDLE;
         uav.activeRequestId = -1;
         uav.targetWaypoint = spawnPos;
-        uav.isGrounded = (spawnPos.z <= 0.01);
+        uav.isGrounded = true;
 
         UAVContext ctx;
         ctx.dwellTimer = 0.0;
@@ -225,7 +221,9 @@ void FleetManager::step(
                     uav.acceleration = Vec3(0, 0, 0);
                 } else {
                     for (auto& s : map.chargingStations) {
-                        if (m_batteryModel.isInDockingRange(uav, s)) {
+                        double dist = uav.position.distance(s.position);
+                        if (dist <= 15.0 && s.hasAvailableSlot()) {
+                            uav.position = s.position;
                             uav.velocity = Vec3(0, 0, 0);
                             uav.acceleration = Vec3(0, 0, 0);
                             if (m_batteryModel.dock(uav, s)) {
@@ -400,6 +398,20 @@ void FleetManager::handleReturningToCharge(UAVState& uav, UAVContext& ctx, CityM
         }
     }
 
+    // Dynamic station re-routing if target station became full
+    if (targetStation && !targetStation->hasAvailableSlot()) {
+        int32_t altId = findNearestAvailableCharger(uav.position, map);
+        if (altId != -1 && altId != ctx.targetChargerId) {
+            ctx.targetChargerId = altId;
+            for (auto& station : map.chargingStations) {
+                if (station.id == ctx.targetChargerId) {
+                    targetStation = &station;
+                    break;
+                }
+            }
+        }
+    }
+
     if (!targetStation && !map.chargingStations.empty()) {
         targetStation = &map.chargingStations.front();
         ctx.targetChargerId = targetStation->id;
@@ -432,6 +444,8 @@ void FleetManager::handleReturningToCharge(UAVState& uav, UAVContext& ctx, CityM
             uav.acceleration = Vec3(0, 0, 0);
             if (m_batteryModel.dock(uav, *targetStation)) {
                 uav.mode = UAVMode::CHARGING;
+            } else if (!targetStation->hasAvailableSlot()) {
+                ctx.targetChargerId = findNearestAvailableCharger(uav.position, map);
             }
         }
     }

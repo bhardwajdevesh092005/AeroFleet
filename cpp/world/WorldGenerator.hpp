@@ -15,7 +15,7 @@ struct GenerationParameters {
     double maxBuildingHeight{185.0};
     int32_t numStores{6};
     int32_t numCustomers{30};
-    int32_t numChargingStations{6};
+    int32_t numChargingStations{12};
 };
 
 class WorldGenerator {

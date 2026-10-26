@@ -85,6 +85,7 @@ add_library(AeroFleetCore STATIC
     cpp/control/ONNXNavigationPolicy.cpp
     cpp/inference/ONNXModel.cpp
     cpp/coordinator/HeuristicCoordinator.cpp
+    cpp/coordinator/ONNXCoordinatorPolicy.cpp
     cpp/visualization/CameraController.cpp
     cpp/visualization/Renderer.cpp
     cpp/telemetry/Metrics.cpp

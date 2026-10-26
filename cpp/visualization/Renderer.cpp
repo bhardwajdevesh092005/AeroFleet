@@ -651,7 +651,7 @@ void Renderer::updateHudCache(const WorldSnapshot& snapshot, const CameraControl
 
     const auto* uav = snapshot.findUAV(m_config.selectedUavId);
     if (uav) {
-        m_hudCache.telemetryHeader = "UAV #" + std::to_string(uav->id) + " TELEMETRY";
+        m_hudCache.telemetryHeader = "UAV #" + std::to_string(uav->id + 1) + " TELEMETRY";
         m_hudCache.telemetryMode = uavModeToString(uav->mode);
 
         std::ostringstream socOss;
@@ -691,10 +691,6 @@ void Renderer::draw(const WorldSnapshot& snapshot, const CityMap& map, CameraCon
     if (IsKeyPressed(KEY_Q)) cycleQuality();
     if (IsKeyPressed(KEY_P)) captureScreenshot();
     if (IsKeyPressed(KEY_SLASH)) m_showControlsHelp = !m_showControlsHelp;
-    if (IsKeyPressed(KEY_TAB)) {
-        cycleSelectedUav(snapshot.uavs.size());
-        camera.setChaseTarget(m_config.selectedUavId);
-    }
 
     // Build GPU city models on first frame with map data
     if (!m_cityModelsLoaded && !map.buildings.empty()) {
@@ -1141,7 +1137,7 @@ void Renderer::drawDroneScreenBillboard(const UAVState& uav, const CameraControl
     Color textCol = fadeColor(WHITE, alpha);
     Color batCol = fadeColor(getBatteryColor(uav.batteryPercent), alpha);
 
-    std::string tag = "#" + std::to_string(uav.id) + " · " + std::to_string(static_cast<int>(uav.batteryPercent)) + "%";
+    std::string tag = "#" + std::to_string(uav.id + 1) + " · " + std::to_string(static_cast<int>(uav.batteryPercent)) + "%";
     const int tagW = 74;
     const int tagH = 20;
 
@@ -1315,7 +1311,7 @@ void Renderer::drawFleetBatteryOverview(const WorldSnapshot& snapshot, CameraCon
             m_config.selectedUavId = u.id;
             camera.setChaseTarget(u.id);
             camera.setMode(CameraMode::CHASE);
-            addToast("Chasing UAV #" + std::to_string(u.id), Color{56, 189, 248, 255});
+            addToast("Chasing UAV #" + std::to_string(u.id + 1), Color{56, 189, 248, 255});
         }
 
         if (isSel) {
@@ -1330,7 +1326,7 @@ void Renderer::drawFleetBatteryOverview(const WorldSnapshot& snapshot, CameraCon
         DrawCircle(panelX + 14, itemY + 8, 4.0f, modeCol);
 
         // UAV Label
-        std::string label = "#" + std::to_string(u.id);
+        std::string label = "#" + std::to_string(u.id + 1);
         drawTextSans(label.c_str(), panelX + 24, itemY + 2, 12, isSel ? YELLOW : WHITE, isSel);
 
         // Battery bar
