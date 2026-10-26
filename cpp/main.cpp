@@ -65,7 +65,254 @@ void printHelp(const char* prog) {
               << "  --no-safety           Disable deterministic Safety Layer obstacle filter\n"
               << "  --log-events          Enable event ring-buffer logging to simulation_events.jsonl\n"
               << "  --no-metrics          Disable saving metrics to JSON/CSV\n"
+              << "  --scenario <all|standard> Run All-Scenarios Showcase (default in visual) or standard run\n"
+              << "  --battery-drain <mult>    Accelerate battery discharge rate (default in visual: 15.0x)\n"
+              << "  --fast-battery            Shortcut for --battery-drain 25.0\n"
+              << "  --showcase                Explicitly activate All-Scenarios Showcase\n"
               << "  --help, -h            Show this help message and exit\n\n";
+}
+
+void setupShowcaseScenarios(
+    FleetManager& fleet,
+    std::vector<DeliveryRequest>& pendingRequests,
+    CityMap& map,
+    double currentTime
+) {
+    if (fleet.size() < 10) return;
+
+    (void)pendingRequests;
+    for (auto& cs : map.chargingStations) {
+        cs.occupiedCount = 0;
+    }
+
+    auto makeClearPos = [&](Vec3 p) {
+        while (!map.isLocationClear(p, 3.0) && p.z < 195.0) {
+            p.z += 10.0;
+        }
+        if (!map.isLocationClear(p, 3.0)) {
+            p = Vec3(0.0, 0.0, 35.0); // Fall back to central plaza which is guaranteed open
+        }
+        return p;
+    };
+
+    // UAV 0: Available at Central Base, 100% battery (IDLE)
+    {
+        auto& u = fleet.getUAV(0);
+        u.mode = UAVMode::IDLE;
+        u.batteryPercent = 100.0;
+        u.payloadMass = 0.0;
+        u.activeRequestId = -1;
+        if (!map.chargingStations.empty()) {
+            u.position = map.chargingStations[0].position;
+        }
+        u.velocity = Vec3(0, 0, 0);
+        u.targetWaypoint = u.position;
+    }
+
+    // UAV 1: Flying to pickup at Store 0, 78% battery
+    if (!map.stores.empty()) {
+        auto& u = fleet.getUAV(1);
+        u.mode = UAVMode::FLYING_TO_PICKUP;
+        u.batteryPercent = 78.0;
+        u.payloadMass = 0.0;
+        const Vec3 storePos = map.stores[0].position;
+        u.position = makeClearPos(Vec3(storePos.x * 0.4, storePos.y * 0.4, 25.0));
+        u.targetWaypoint = storePos;
+        u.velocity = (storePos - u.position).normalized() * 12.0;
+
+        DeliveryRequest req;
+        req.id = 101;
+        req.storeId = map.stores[0].id;
+        req.pickupLocation = storePos;
+        req.dropoffLocation = makeClearPos(Vec3(160.0, 120.0, 15.0));
+        req.payloadMass = 1.0;
+        req.creationTime = currentTime;
+        req.deadline = currentTime + 300.0;
+        req.status = RequestStatus::ASSIGNED;
+        req.assignedUavId = 1;
+        auto& ctx = fleet.getContext(1);
+        ctx.activeRequest = req;
+        ctx.assignedRequestId = 101;
+        u.activeRequestId = 101;
+    }
+
+    // UAV 2: Delivering package en-route across skyline, 62% battery
+    {
+        auto& u = fleet.getUAV(2);
+        u.mode = UAVMode::FLYING_TO_DESTINATION;
+        u.batteryPercent = 62.0;
+        u.payloadMass = 1.25;
+        u.position = makeClearPos(Vec3(-90.0, 130.0, 38.0));
+        const Vec3 dropoff = makeClearPos(Vec3(-240.0, 210.0, 15.0));
+        u.targetWaypoint = dropoff;
+        u.velocity = (dropoff - u.position).normalized() * 14.0;
+
+        DeliveryRequest req;
+        req.id = 102;
+        req.storeId = map.stores.empty() ? 0 : map.stores[0].id;
+        req.pickupLocation = Vec3(0, 0, 15.0);
+        req.dropoffLocation = dropoff;
+        req.payloadMass = 1.25;
+        req.creationTime = currentTime - 20.0;
+        req.deadline = currentTime + 280.0;
+        req.status = RequestStatus::IN_TRANSIT;
+        req.assignedUavId = 2;
+        auto& ctx = fleet.getContext(2);
+        ctx.activeRequest = req;
+        ctx.assignedRequestId = 102;
+        u.activeRequestId = 102;
+    }
+
+    // UAV 3: Dropping off payload with active cargo tether, 52% battery
+    {
+        auto& u = fleet.getUAV(3);
+        u.mode = UAVMode::DROPPING_OFF;
+        u.batteryPercent = 52.0;
+        u.payloadMass = 0.85;
+        const Vec3 dropLoc(130.0, -170.0, 16.0);
+        u.position = makeClearPos(dropLoc);
+        u.targetWaypoint = u.position;
+        u.velocity = Vec3(0, 0, 0);
+
+        DeliveryRequest req;
+        req.id = 103;
+        req.storeId = 0;
+        req.pickupLocation = Vec3(0, 0, 15);
+        req.dropoffLocation = u.position;
+        req.payloadMass = 0.85;
+        req.creationTime = currentTime - 40.0;
+        req.deadline = currentTime + 260.0;
+        req.status = RequestStatus::IN_TRANSIT;
+        req.assignedUavId = 3;
+        auto& ctx = fleet.getContext(3);
+        ctx.activeRequest = req;
+        ctx.assignedRequestId = 103;
+        ctx.dwellTimer = 1.0;
+        u.activeRequestId = 103;
+    }
+
+    // UAV 4: LOW BATTERY RTH TRIGGERED! Battery at 18.0% (<= 20% reserve threshold)
+    {
+        auto& u = fleet.getUAV(4);
+        u.mode = UAVMode::RETURNING_TO_CHARGE;
+        u.batteryPercent = 18.0;
+        u.payloadMass = 0.0;
+        u.activeRequestId = -1;
+        u.position = makeClearPos(Vec3(210.0, -190.0, 32.0));
+        const Vec3 targetStation = (!map.chargingStations.empty()) ? map.chargingStations[0].position : Vec3(0, 0, 0);
+        u.targetWaypoint = Vec3(targetStation.x, targetStation.y, 35.0);
+        u.velocity = (u.targetWaypoint - u.position).normalized() * 14.0;
+        auto& ctx = fleet.getContext(4);
+        ctx.targetChargerId = (!map.chargingStations.empty()) ? map.chargingStations[0].id : 0;
+    }
+
+    // UAV 5: DOCKED & ACTIVELY CHARGING! 35.0% battery
+    if (map.chargingStations.size() > 1) {
+        auto& u = fleet.getUAV(5);
+        u.mode = UAVMode::CHARGING;
+        u.batteryPercent = 35.0;
+        u.payloadMass = 0.0;
+        u.activeRequestId = -1;
+        u.position = map.chargingStations[1].position;
+        u.targetWaypoint = u.position;
+        u.velocity = Vec3(0, 0, 0);
+        map.chargingStations[1].occupiedCount++;
+        auto& ctx = fleet.getContext(5);
+        ctx.targetChargerId = map.chargingStations[1].id;
+    }
+
+    // UAV 6: CRITICAL BATTERY RUSHING TO RECHARGE! 12.0% battery
+    {
+        auto& u = fleet.getUAV(6);
+        u.mode = UAVMode::RETURNING_TO_CHARGE;
+        u.batteryPercent = 12.0;
+        u.payloadMass = 0.0;
+        u.activeRequestId = -1;
+        u.position = makeClearPos(Vec3(-180.0, -150.0, 26.0));
+        const Vec3 targetStation = (map.chargingStations.size() > 2) ? map.chargingStations[2].position : Vec3(0, 0, 0);
+        u.targetWaypoint = Vec3(targetStation.x, targetStation.y, 30.0);
+        u.velocity = (u.targetWaypoint - u.position).normalized() * 15.0;
+        auto& ctx = fleet.getContext(6);
+        ctx.targetChargerId = (map.chargingStations.size() > 2) ? map.chargingStations[2].id : 0;
+    }
+
+    // UAV 7: HEAVY PAYLOAD COURIER (2.95 kg cargo, 74% battery)
+    {
+        auto& u = fleet.getUAV(7);
+        u.mode = UAVMode::FLYING_TO_DESTINATION;
+        u.batteryPercent = 74.0;
+        u.payloadMass = 2.95;
+        u.position = makeClearPos(Vec3(-110.0, -60.0, 36.0));
+        const Vec3 dropoff = makeClearPos(Vec3(210.0, 200.0, 20.0));
+        u.targetWaypoint = dropoff;
+        u.velocity = (dropoff - u.position).normalized() * 11.0;
+
+        DeliveryRequest req;
+        req.id = 107;
+        req.storeId = 0;
+        req.pickupLocation = Vec3(0, 0, 15);
+        req.dropoffLocation = dropoff;
+        req.payloadMass = 2.95;
+        req.creationTime = currentTime - 10.0;
+        req.deadline = currentTime + 350.0;
+        req.status = RequestStatus::IN_TRANSIT;
+        req.assignedUavId = 7;
+        auto& ctx = fleet.getContext(7);
+        ctx.activeRequest = req;
+        ctx.assignedRequestId = 107;
+        u.activeRequestId = 107;
+    }
+
+    // UAV 8 & 9: TRAFFIC SEPARATION & OBSTACLE CLEARANCE DEMO
+    {
+        const Vec3 dropoff8 = makeClearPos(Vec3(55.0, 0.0, 32.0));
+        auto& u8 = fleet.getUAV(8);
+        u8.mode = UAVMode::FLYING_TO_DESTINATION;
+        u8.batteryPercent = 85.0;
+        u8.payloadMass = 0.5;
+        u8.position = makeClearPos(Vec3(-45.0, 0.0, 32.0));
+        u8.targetWaypoint = dropoff8;
+        u8.velocity = Vec3(12.0, 0.0, 0.0);
+
+        DeliveryRequest req8;
+        req8.id = 108;
+        req8.storeId = 0;
+        req8.pickupLocation = Vec3(0, 0, 15);
+        req8.dropoffLocation = dropoff8;
+        req8.payloadMass = 0.5;
+        req8.creationTime = currentTime - 15.0;
+        req8.deadline = currentTime + 300.0;
+        req8.status = RequestStatus::IN_TRANSIT;
+        req8.assignedUavId = 8;
+        auto& ctx8 = fleet.getContext(8);
+        ctx8.activeRequest = req8;
+        ctx8.assignedRequestId = 108;
+        u8.activeRequestId = 108;
+
+        const Vec3 dropoff9 = makeClearPos(Vec3(0.0, 55.0, 32.0));
+        auto& u9 = fleet.getUAV(9);
+        u9.mode = UAVMode::FLYING_TO_DESTINATION;
+        u9.batteryPercent = 82.0;
+        u9.payloadMass = 0.5;
+        u9.position = makeClearPos(Vec3(0.0, -45.0, 32.0));
+        u9.targetWaypoint = dropoff9;
+        u9.velocity = Vec3(0.0, 12.0, 0.0);
+
+        DeliveryRequest req9;
+        req9.id = 109;
+        req9.storeId = 0;
+        req9.pickupLocation = Vec3(0, 0, 15);
+        req9.dropoffLocation = dropoff9;
+        req9.payloadMass = 0.5;
+        req9.creationTime = currentTime - 15.0;
+        req9.deadline = currentTime + 300.0;
+        req9.status = RequestStatus::IN_TRANSIT;
+        req9.assignedUavId = 9;
+        auto& ctx9 = fleet.getContext(9);
+        ctx9.activeRequest = req9;
+        ctx9.assignedRequestId = 109;
+        u9.activeRequestId = 109;
+    }
 }
 
 } // namespace
@@ -86,6 +333,9 @@ int main(int argc, char* argv[]) {
     std::string navPolicyPath = "models/navigation/nav_policy.onnx";
     std::string normPath = "models/navigation/normalization.json";
     bool useSafety = true;
+
+    std::string scenario = "all";
+    double batteryDrain = -1.0;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -120,6 +370,16 @@ int main(int argc, char* argv[]) {
             logEvents = true;
         } else if (arg == "--no-metrics") {
             exportMetrics = false;
+        } else if (arg == "--scenario" && i + 1 < argc) {
+            scenario = argv[++i];
+        } else if ((arg == "--battery-drain" || arg == "--battery-multiplier") && i + 1 < argc) {
+            batteryDrain = std::stod(argv[++i]);
+        } else if (arg == "--fast-battery") {
+            batteryDrain = 25.0;
+        } else if (arg == "--showcase") {
+            scenario = "all";
+        } else if (arg == "--standard") {
+            scenario = "standard";
         }
     }
 
@@ -204,9 +464,9 @@ int main(int argc, char* argv[]) {
 
     // 3. Initialize visualizer (unless headless requested)
     RendererConfig rendererConfig;
-    rendererConfig.targetFPS = 60;
+    rendererConfig.targetFPS = 30;
     Renderer renderer(rendererConfig);
-    CameraController camera(Vec3(0.0, 0.0, 15.0), 350.0);
+    CameraController camera(Vec3(0.0, 0.0, 20.0), 650.0);
 
     bool visualMode = !headless;
     if (visualMode) {
@@ -218,6 +478,19 @@ int main(int argc, char* argv[]) {
         }
     } else {
         std::cout << "[System] Running in headless mode.\n";
+    }
+
+    if (batteryDrain <= 0.0) {
+        batteryDrain = visualMode ? 15.0 : 1.0;
+    }
+    fleet.setBatteryDischargeMultiplier(batteryDrain);
+    renderer.setBatteryDrainMultiplier(batteryDrain);
+    renderer.setScenarioName(scenario == "all" ? "All Scenarios Showcase" : "Standard Run");
+
+    if (scenario == "all") {
+        setupShowcaseScenarios(fleet, pendingRequests, map, 0.0);
+        std::cout << "[System] Scenario Initialized: All 10 Fleet Scenarios Active concurrently.\n";
+        std::cout << "[System] Accelerated Battery Drain: " << batteryDrain << "x\n";
     }
 
     // Previous positions vector for continuous collision detection
@@ -416,18 +689,82 @@ int main(int argc, char* argv[]) {
         if (visualMode) {
             camera.handleInput(elapsed.count());
             camera.update(elapsed.count(), currSnapshot);
-            if (IsKeyPressed(KEY_TAB)) {
-                renderer.cycleSelectedUav(fleet.size());
-                camera.setChaseTarget(renderer.getSelectedUav());
-            }
             if (IsKeyPressed(KEY_C)) {
                 camera.cycleMode();
             }
-            if (IsKeyPressed(KEY_H)) {
-                renderer.toggleHUD();
+            if (IsKeyPressed(KEY_O)) {
+                camera.toggleCinematicAutoOrbit();
+                renderer.addToast(camera.isCinematicAutoOrbit() ? "Cinematic Auto-Orbit: ON" : "Cinematic Auto-Orbit: OFF", Color{245, 205, 35, 255});
             }
-            if (IsKeyPressed(KEY_T)) {
-                renderer.toggleTrajectories();
+            if (IsKeyPressed(KEY_B)) {
+                double currentMult = fleet.getBatteryDischargeMultiplier();
+                double nextMult = 1.0;
+                if (currentMult < 4.0) nextMult = 5.0;
+                else if (currentMult < 12.0) nextMult = 15.0;
+                else if (currentMult < 25.0) nextMult = 30.0;
+                else if (currentMult < 45.0) nextMult = 50.0;
+                else nextMult = 1.0;
+                fleet.setBatteryDischargeMultiplier(nextMult);
+                renderer.setBatteryDrainMultiplier(nextMult);
+                renderer.addToast("Battery Drain: " + std::to_string(static_cast<int>(nextMult)) + "x", Color{245, 205, 35, 255});
+                std::cout << "[Simulator] Battery discharge multiplier set to " << nextMult << "x\n";
+            }
+            if (IsKeyPressed(KEY_D)) {
+                UAVId sel = renderer.getSelectedUav();
+                if (sel >= 0 && static_cast<size_t>(sel) < fleet.size()) {
+                    fleet.setUAVBatteryPercent(sel, 18.0);
+                    renderer.addToast("UAV #" + std::to_string(sel) + " Low Battery (18%) RTH", Color{231, 76, 60, 255});
+                    std::cout << "[Simulator] UAV #" << sel << " battery forced to 18.0% (Low-Battery RTH Triggered!)\n";
+                }
+            }
+            if (IsKeyPressed(KEY_F)) {
+                UAVId sel = renderer.getSelectedUav();
+                if (sel >= 0 && static_cast<size_t>(sel) < fleet.size()) {
+                    fleet.setUAVBatteryPercent(sel, 100.0);
+                    auto& u = fleet.getUAV(sel);
+                    u.mode = UAVMode::IDLE;
+                    u.velocity = Vec3(0, 0, 0);
+                    u.acceleration = Vec3(0, 0, 0);
+                    auto& ctx = fleet.getContext(sel);
+                    if (ctx.targetChargerId != -1) {
+                        for (auto& s : map.chargingStations) {
+                            if (s.id == ctx.targetChargerId) {
+                                if (s.occupiedCount > 0) s.occupiedCount--;
+                            }
+                        }
+                        ctx.targetChargerId = -1;
+                    }
+                    renderer.addToast("UAV #" + std::to_string(sel) + " 100% Recharged (Mode: IDLE)", Color{46, 204, 113, 255});
+                    std::cout << "[Simulator] UAV #" << sel << " battery recharged to 100.0% (Mode: IDLE)\n";
+                }
+            }
+            if (IsKeyPressed(KEY_K)) {
+                UAVId sel = renderer.getSelectedUav();
+                if (sel >= 0 && static_cast<size_t>(sel) < fleet.size()) {
+                    fleet.setUAVBatteryPercent(sel, 0.0);
+                    renderer.addToast("UAV #" + std::to_string(sel) + " Battery Depleted (0%)", Color{231, 76, 60, 255});
+                    std::cout << "[Simulator] UAV #" << sel << " battery depleted to 0.0% (Emergency shutdown!)\n";
+                }
+            }
+            if (IsKeyPressed(KEY_S)) {
+                setupShowcaseScenarios(fleet, pendingRequests, map, clock.now());
+                renderer.addToast("Reset Fleet to Showcase", Color{56, 189, 248, 255});
+                std::cout << "[Simulator] Reset fleet to All-Scenarios Showcase.\n";
+            }
+            for (int k = KEY_ONE; k <= KEY_NINE; ++k) {
+                if (IsKeyPressed(k)) {
+                    UAVId target = static_cast<UAVId>(k - KEY_ONE);
+                    if (static_cast<size_t>(target) < fleet.size()) {
+                        renderer.setSelectedUav(target);
+                        camera.setChaseTarget(target);
+                        camera.setMode(aerofleet::CameraMode::CHASE);
+                        renderer.addToast("Chasing UAV #" + std::to_string(target), Color{56, 189, 248, 255});
+                    }
+                }
+            }
+            if (IsKeyPressed(KEY_ZERO)) {
+                camera.setMode(aerofleet::CameraMode::ORBIT);
+                renderer.addToast("Camera: ORBIT", Color{56, 189, 248, 255});
             }
             WorldSnapshot renderSnapshot = WorldSnapshot::interpolate(prevSnapshot, currSnapshot, clock.getAlpha());
             renderer.draw(renderSnapshot, map, camera);
