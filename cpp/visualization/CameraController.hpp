@@ -85,11 +85,14 @@ public:
     [[nodiscard]] double getFov() const noexcept { return m_fov; }
 
     void setTarget(const Vec3& target) noexcept { m_target = target; }
-    void setDistance(double dist) noexcept { m_distance = MathUtils::clamp(dist, 10.0, 2000.0); }
+    void setDistance(double dist) noexcept { m_distance = MathUtils::clamp(dist, 10.0, 12000.0); }
     [[nodiscard]] double getDistance() const noexcept { return m_distance; }
 
     [[nodiscard]] double getAzimuth() const noexcept { return m_azimuth; }
     [[nodiscard]] double getElevation() const noexcept { return m_elevation; }
+
+    void toggleCinematicAutoOrbit() noexcept { m_cinematicAutoOrbit = !m_cinematicAutoOrbit; }
+    [[nodiscard]] bool isCinematicAutoOrbit() const noexcept { return m_cinematicAutoOrbit; }
 
     /**
      * @brief Construct raylib Camera3D representation.
@@ -115,6 +118,10 @@ private:
 
     // Top-down parameters
     double m_topDownAltitude{450.0};
+
+    // Cinematic mode
+    bool m_cinematicAutoOrbit{false};
+    double m_cinematicTimer{0.0};
 };
 
 } // namespace aerofleet

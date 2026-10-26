@@ -83,25 +83,43 @@ void CameraController::cycleChaseTarget(size_t fleetSize) noexcept {
 }
 
 void CameraController::update(double dt, const WorldSnapshot& snapshot) {
+    if (m_cinematicAutoOrbit) {
+        m_cinematicTimer += dt;
+        m_azimuth += dt * 0.08;
+        m_azimuth = MathUtils::wrapAnglePi(m_azimuth);
+        m_elevation = 0.26 + std::sin(m_cinematicTimer * 0.2) * 0.08;
+
+        // In cinematic mode, gently dolly distance
+        m_distance = 280.0 + std::sin(m_cinematicTimer * 0.1) * 60.0;
+
+        // Periodic auto-switch between drones every 12s if in chase mode
+        if (m_mode == CameraMode::CHASE && std::fmod(m_cinematicTimer, 12.0) < dt && !snapshot.uavs.empty()) {
+            cycleChaseTarget(snapshot.uavs.size());
+        }
+    }
+
     switch (m_mode) {
         case CameraMode::ORBIT: {
-            m_position = computeOrbitPosition(m_target, m_distance, m_azimuth, m_elevation);
+            const Vec3 idealPos = computeOrbitPosition(m_target, m_distance, m_azimuth, m_elevation);
+            const double lerpFactor = MathUtils::clamp(dt * 6.0, 0.05, 1.0);
+            m_position = m_position.lerp(idealPos, lerpFactor);
             m_up = Vec3(0.0, 0.0, 1.0);
             break;
         }
         case CameraMode::CHASE: {
             const auto* uav = snapshot.findUAV(m_chaseTargetId);
             if (uav) {
+                // Tighter chase distance (14m behind, 5m above) with slight velocity look-ahead
+                const Vec3 lookAhead = uav->velocity * 0.5;
                 const Vec3 idealPos = computeChasePosition(uav->position, uav->yaw, m_chaseDistance, m_chaseHeight);
-                const Vec3 idealTarget = uav->position + Vec3(0.0, 0.0, 1.0);
+                const Vec3 idealTarget = uav->position + Vec3(0.0, 0.0, 1.0) + lookAhead;
 
-                // Smooth camera dampening
-                const double lerpFactor = MathUtils::clamp(dt * 8.0, 0.1, 1.0);
+                // Smooth camera dampening (no snapping)
+                const double lerpFactor = MathUtils::clamp(dt * 7.0, 0.08, 1.0);
                 m_position = m_position.lerp(idealPos, lerpFactor);
                 m_target = m_target.lerp(idealTarget, lerpFactor);
                 m_up = Vec3(0.0, 0.0, 1.0);
             } else {
-                // Target UAV not found; fall back to orbit
                 m_position = computeOrbitPosition(m_target, m_distance, m_azimuth, m_elevation);
             }
             break;
@@ -112,7 +130,6 @@ void CameraController::update(double dt, const WorldSnapshot& snapshot) {
             break;
         }
         case CameraMode::FREE: {
-            // Free mode position and target updated in handleInput
             break;
         }
     }
@@ -124,6 +141,9 @@ void CameraController::handleInput(double dt) {
     // 1. Mode cycling hotkeys
     if (IsKeyPressed(KEY_C)) {
         cycleMode();
+    }
+    if (IsKeyPressed(KEY_O)) {
+        toggleCinematicAutoOrbit();
     }
     if (IsKeyPressed(KEY_TAB)) {
         m_chaseTargetId = (m_chaseTargetId + 1) % 10;
@@ -143,8 +163,10 @@ void CameraController::handleInput(double dt) {
 
         const float wheel = GetMouseWheelMove();
         if (std::abs(wheel) > 0.001f) {
-            m_distance -= wheel * 25.0;
-            m_distance = MathUtils::clamp(m_distance, 20.0, 1500.0);
+            // Adaptive exponential zoom: smooth at street level, swift across vast metropolitan view
+            const double zoomDelta = wheel * (m_distance * 0.12 + 20.0);
+            m_distance -= zoomDelta;
+            m_distance = MathUtils::clamp(m_distance, 15.0, 10000.0);
         }
 
         // Panning with arrow keys or WASD
@@ -165,13 +187,14 @@ void CameraController::handleInput(double dt) {
         const float wheel = GetMouseWheelMove();
         if (std::abs(wheel) > 0.001f) {
             m_chaseDistance -= wheel * 3.0;
-            m_chaseDistance = MathUtils::clamp(m_chaseDistance, 5.0, 60.0);
+            m_chaseDistance = MathUtils::clamp(m_chaseDistance, 5.0, 80.0);
         }
     } else if (m_mode == CameraMode::TOP_DOWN) {
         const float wheel = GetMouseWheelMove();
         if (std::abs(wheel) > 0.001f) {
-            m_topDownAltitude -= wheel * 30.0;
-            m_topDownAltitude = MathUtils::clamp(m_topDownAltitude, 50.0, 1500.0);
+            const double zoomDelta = wheel * (m_topDownAltitude * 0.12 + 25.0);
+            m_topDownAltitude -= zoomDelta;
+            m_topDownAltitude = MathUtils::clamp(m_topDownAltitude, 30.0, 8000.0);
         }
         const double panSpeed = m_topDownAltitude * 0.5 * dt;
         if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) m_target.y += panSpeed;
