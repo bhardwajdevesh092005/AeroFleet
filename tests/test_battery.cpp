@@ -242,6 +242,22 @@ void test_reserve_and_critical_thresholds() {
     TEST_ASSERT(model.isDepleted(0.0), "0% is depleted");
 }
 
+void test_idle_grounded_zero_discharge() {
+    FleetSettings fleet;
+    EnergySettings energy;
+    BatteryModel model(fleet, energy);
+
+    UAVState idleUav(1, Vec3(0, 0, 0));
+    idleUav.velocity = Vec3(0, 0, 0);
+    idleUav.batteryPercent = 95.0;
+    idleUav.mode = UAVMode::IDLE;
+    idleUav.isGrounded = true;
+
+    double energyJoules = model.stepDischarge(idleUav, 10.0);
+    TEST_ASSERT(energyJoules == 0.0, "Idle grounded UAV must consume 0 energy");
+    TEST_ASSERT(idleUav.batteryPercent == 95.0, "Idle grounded UAV battery must not discharge");
+}
+
 int main() {
     std::cout << "========================================\n";
     std::cout << "      AeroFleet Battery Tests           \n";
@@ -256,6 +272,7 @@ int main() {
     RUN_TEST(test_battery_depletion_emergency_cutoff);
     RUN_TEST(test_battery_recharge_clamping);
     RUN_TEST(test_reserve_and_critical_thresholds);
+    RUN_TEST(test_idle_grounded_zero_discharge);
 
     std::cout << "========================================\n";
     std::cout << "Summary: " << g_testsPassed << " Passed, " << g_testsFailed << " Failed\n";

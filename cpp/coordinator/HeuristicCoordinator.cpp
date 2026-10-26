@@ -65,7 +65,7 @@ bool HeuristicCoordinator::energyFeasible(
     const double climb2 = std::max(0.0, transitAlt - request.pickupLocation.z);
     const double climbJoules = cClimb * (climb1 + climb2);
 
-    const double dischargeMult = std::max(1.0, battery.getDischargeMultiplier());
+    const double dischargeMult = MathUtils::clamp(battery.getDischargeMultiplier(), 1.0, 2.5);
     const double totalRequiredJoules = (flightJoules + dwellJoules + climbJoules) * dischargeMult;
 
     const auto& batteryConfig = battery.getConfig();
@@ -146,6 +146,21 @@ void HeuristicCoordinator::dispatch(
             assigned[bestUav] = true;
         } else {
             assigned[bestUav] = true;
+        }
+    }
+
+    // Proactive opportunity charging for idle UAVs when queue is empty and battery < 85%
+    for (size_t ui = 0; ui < fleet.size(); ++ui) {
+        if (assigned[ui]) continue;
+        auto& uav = fleet.getUAV(ui);
+        if (uav.mode == UAVMode::IDLE && uav.batteryPercent < 85.0 && requests.empty()) {
+            int32_t chargerId = fleet.findNearestAvailableCharger(uav.position, map);
+            if (chargerId != -1) {
+                auto& ctx = fleet.getContext(uav.id);
+                ctx.targetChargerId = chargerId;
+                uav.mode = UAVMode::RETURNING_TO_CHARGE;
+                assigned[ui] = true;
+            }
         }
     }
 }

@@ -509,7 +509,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (batteryDrain <= 0.0) {
-        batteryDrain = visualMode ? 15.0 : 1.0;
+        batteryDrain = 1.0;
     }
     fleet.setBatteryDischargeMultiplier(batteryDrain);
     renderer.setBatteryDrainMultiplier(batteryDrain);
@@ -649,8 +649,10 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 integrator.stepVelocityCommand(uav, action, dt);
-                fleet.getBatteryModel().stepDischarge(uav, dt);
-                totalPowerWatts += fleet.getBatteryModel().computePowerWatts(uav.velocity, uav.payloadMass);
+                if (uav.mode != UAVMode::IDLE && uav.mode != UAVMode::CHARGING && !uav.isGrounded) {
+                    fleet.getBatteryModel().stepDischarge(uav, dt);
+                    totalPowerWatts += fleet.getBatteryModel().computePowerWatts(uav.velocity, uav.payloadMass);
+                }
             }
             metrics.recordStep(fleet.getAllUAVs(), dt, totalPowerWatts, currentTime);
 

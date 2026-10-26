@@ -32,7 +32,8 @@ double BatteryModel::computePowerWatts(const Vec3& velocity, double payloadMass)
 }
 
 double BatteryModel::stepDischarge(UAVState& uav, double dt) const {
-    if (dt <= 0.0 || uav.batteryPercent <= 0.0) {
+    if (dt <= 0.0 || uav.batteryPercent <= 0.0 || uav.mode == UAVMode::CHARGING || uav.isGrounded ||
+        (uav.mode == UAVMode::IDLE && uav.speed() < 0.1)) {
         if (uav.batteryPercent <= 0.0) {
             uav.batteryPercent = 0.0;
             uav.velocity = Vec3(0.0, 0.0, 0.0);

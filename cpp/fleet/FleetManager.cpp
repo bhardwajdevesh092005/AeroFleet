@@ -376,8 +376,9 @@ void FleetManager::handleDroppingOff(
         ctx.assignedRequestId = -1;
         ctx.dwellTimer = 0.0;
 
-        if (uav.batteryPercent <= 25.0 || m_batteryModel.isReserve(uav.batteryPercent)) {
+        if (uav.batteryPercent <= 80.0 || m_batteryModel.isReserve(uav.batteryPercent)) {
             uav.mode = UAVMode::RETURNING_TO_CHARGE;
+            ctx.targetChargerId = -1;
         } else {
             uav.mode = UAVMode::IDLE;
             uav.targetWaypoint = ctx.homeBasePosition;

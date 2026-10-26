@@ -185,9 +185,31 @@ void ONNXCoordinatorPolicy::dispatch(
             }
         }
 
-        // If WAIT or no feasible assignment beats WAIT threshold, terminate iteration
+        // If WAIT was selected or no feasible assignment beats WAIT threshold:
+        // Pick the highest-logit feasible candidate action so requests are not stalled
         if (bestAction == 0) {
-            break;
+            float maxCandidateLogit = -std::numeric_limits<float>::infinity();
+            for (size_t pi = 0; pi < pendingIndices.size(); ++pi) {
+                size_t reqIndex = pendingIndices[pi];
+                const auto& req = requests[reqIndex];
+                if (req.status != RequestStatus::PENDING) continue;
+
+                for (size_t ui = 0; ui < std::min(fleet.size(), size_t(10)); ++ui) {
+                    if (assigned[ui]) continue;
+                    const auto& uav = fleet.getUAV(ui);
+                    if (uav.mode != UAVMode::IDLE || uav.batteryPercent <= m_config.minBatteryDispatchPercent) continue;
+                    if (!m_fallback.energyFeasible(uav, req, map, battery)) continue;
+
+                    int actionIdx = 1 + static_cast<int>(pi * 10 + ui);
+                    if (actionIdx < static_cast<int>(logits.size()) && logits[actionIdx] > maxCandidateLogit) {
+                        maxCandidateLogit = logits[actionIdx];
+                        bestAction = actionIdx;
+                    }
+                }
+            }
+            if (bestAction == 0) {
+                break;
+            }
         }
 
         int pairIdx = bestAction - 1;
@@ -207,6 +229,21 @@ void ONNXCoordinatorPolicy::dispatch(
             }
         } else {
             break;
+        }
+    }
+
+    // Proactive opportunity charging for idle UAVs when queue is empty and battery < 85%
+    for (size_t ui = 0; ui < fleet.size(); ++ui) {
+        if (assigned[ui]) continue;
+        auto& uav = fleet.getUAV(ui);
+        if (uav.mode == UAVMode::IDLE && uav.batteryPercent < 85.0 && requests.empty()) {
+            int32_t chargerId = fleet.findNearestAvailableCharger(uav.position, map);
+            if (chargerId != -1) {
+                auto& ctx = fleet.getContext(uav.id);
+                ctx.targetChargerId = chargerId;
+                uav.mode = UAVMode::RETURNING_TO_CHARGE;
+                assigned[ui] = true;
+            }
         }
     }
 }
