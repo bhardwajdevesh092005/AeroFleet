@@ -230,7 +230,9 @@ class AeroFleetCoordinatorEnv(gym.Env):
 
                     slack = max(0.0, (target_req.deadline - self._sim.simulated_time) / 300.0)
                     urgency_bonus = max(0.0, 1.0 - slack)
-                    reward += self._w_assign_bonus + proximity_bonus + 0.5 * urgency_bonus
+                    soc = snap_uavs[uav_idx].battery_percent if uav_idx < len(snap_uavs) else 100.0
+                    battery_comfort = max(0.0, (soc - 30.0) / 70.0)
+                    reward += self._w_assign_bonus + proximity_bonus + 0.5 * urgency_bonus + 0.25 * battery_comfort
                 else:
                     reward -= 1.0  # Invalid dispatch
             else:

@@ -40,12 +40,12 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=ROOT / "config/simulation.json")
     parser.add_argument("--output-dir", type=Path, default=ROOT / "models/coordinator")
-    parser.add_argument("--total-timesteps", type=int, default=50_000)
+    parser.add_argument("--total-timesteps", type=int, default=60_000)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--rollout-steps", type=int, default=512)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--rollout-steps", type=int, default=1024)
+    parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
-    parser.add_argument("--gamma", type=float, default=0.99)
+    parser.add_argument("--gamma", type=float, default=0.995)
     parser.add_argument("--ent-coef", type=float, default=0.01)
     parser.add_argument("--max-episode-steps", type=int, default=300)
     parser.add_argument("--use-onnx-nav", action="store_true", default=False)
@@ -98,6 +98,13 @@ def export_coordinator_onnx(model: MaskablePPO, output_path: Path) -> None:
     print(f"[EXPORT] Coordinator policy exported successfully to {output_path}")
 
 
+def linear_schedule(initial_value: float, final_value: float = 5e-5):
+    """Linear learning rate scheduler."""
+    def func(progress_remaining: float) -> float:
+        return final_value + progress_remaining * (initial_value - final_value)
+    return func
+
+
 def main() -> None:
     args = _parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -122,14 +129,14 @@ def main() -> None:
     env = make_env()
 
     policy_kwargs = dict(
-        net_arch=dict(pi=[256, 256], vf=[256, 256]),
+        net_arch=dict(pi=[256, 256, 128], vf=[256, 256, 128]),
         activation_fn=nn.ReLU,
     )
 
     model = MaskablePPO(
         policy="MlpPolicy",
         env=env,
-        learning_rate=args.learning_rate,
+        learning_rate=linear_schedule(args.learning_rate, 5e-5),
         n_steps=args.rollout_steps,
         batch_size=args.batch_size,
         gamma=args.gamma,

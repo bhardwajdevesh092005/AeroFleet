@@ -3,6 +3,6 @@
   "algorithm": "MaskablePPO",
   "action_space": 101,
   "observation_dim": 164,
-  "total_timesteps": 50000,
+  "total_timesteps": 60000,
   "seed": 42
 }

@@ -170,12 +170,21 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
             return ss.str();
         });
 
+    py::class_<ChargingStation>(m, "ChargingStation")
+        .def_readonly("id", &ChargingStation::id)
+        .def_readonly("name", &ChargingStation::name)
+        .def_readonly("position", &ChargingStation::position)
+        .def_readonly("capacity", &ChargingStation::capacity)
+        .def_readonly("occupied_count", &ChargingStation::occupiedCount)
+        .def("has_available_slot", &ChargingStation::hasAvailableSlot);
+
     py::class_<WorldSnapshot>(m, "WorldSnapshot")
         .def_readonly("simulation_time", &WorldSnapshot::simulationTime)
         .def_readonly("wall_time", &WorldSnapshot::wallTime)
         .def_readonly("step_count", &WorldSnapshot::stepCount)
         .def_readonly("uavs", &WorldSnapshot::uavs)
         .def_readonly("active_requests", &WorldSnapshot::activeRequests)
+        .def_readonly("charging_stations", &WorldSnapshot::chargingStations)
         .def_readonly("metrics", &WorldSnapshot::metrics);
 
     // -------------------------------------------------------------
@@ -352,6 +361,11 @@ PYBIND11_MODULE(aerofleet_cpp, m) {
             auto policy = std::make_shared<ONNXNavigationPolicy>(modelPath, normPath);
             self.setNavigationPolicy(policy);
         }, py::arg("model_path") = "models/navigation/nav_policy.onnx",
-           py::arg("norm_path") = "models/navigation/normalization.json");
+           py::arg("norm_path") = "models/navigation/normalization.json")
+        .def("set_battery_discharge_multiplier", &Simulator::setBatteryDischargeMultiplier, py::arg("mult"))
+        .def("get_battery_discharge_multiplier", &Simulator::getBatteryDischargeMultiplier)
+        .def("set_uav_battery_percent", &Simulator::setUAVBatteryPercent, py::arg("uav_id"), py::arg("percent"))
+        .def("get_uav_battery_percent", &Simulator::getUAVBatteryPercent, py::arg("uav_id"))
+        .def("get_uav_mode", &Simulator::getUAVMode, py::arg("uav_id"));
 }
 
