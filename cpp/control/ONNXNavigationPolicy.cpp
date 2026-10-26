@@ -83,7 +83,8 @@ void ONNXNavigationPolicy::loadNormalization(const std::string& normPath) {
 
 std::vector<float> ONNXNavigationPolicy::buildRawObservation(
     const UAVState& uav,
-    const CityMap& map
+    const CityMap& map,
+    const std::vector<UAVState>& traffic
 ) const {
     std::vector<float> raw;
     raw.reserve(87);
@@ -172,9 +173,36 @@ std::vector<float> ONNXNavigationPolicy::buildRawObservation(
         raw.push_back(static_cast<float>(minHitDist / maxRange));
     }
 
-    // 57..74: Nearby UAVs (3 * 6 = 18 values, zeros when solo)
-    for (int i = 0; i < 18; ++i) {
-        raw.push_back(0.0f);
+    // 57..74: Nearby UAVs (3 * 6 = 18 values)
+    struct NeighborDist {
+        double distSq;
+        const UAVState* uav;
+    };
+    std::vector<NeighborDist> neighbors;
+    neighbors.reserve(traffic.size());
+    for (const auto& other : traffic) {
+        if (other.id != uav.id && other.mode != UAVMode::OFFLINE) {
+            neighbors.push_back({uav.position.distanceSquared(other.position), &other});
+        }
+    }
+    std::sort(neighbors.begin(), neighbors.end(), [](const NeighborDist& a, const NeighborDist& b) {
+        return a.distSq < b.distSq;
+    });
+
+    for (size_t i = 0; i < 3; ++i) {
+        if (i < neighbors.size()) {
+            const auto* other = neighbors[i].uav;
+            Vec3 relPos = worldToBody(other->position - uav.position, uav.yaw);
+            Vec3 relVel = worldToBody(other->velocity - uav.velocity, uav.yaw);
+            raw.push_back(static_cast<float>(relPos.x));
+            raw.push_back(static_cast<float>(relPos.y));
+            raw.push_back(static_cast<float>(relPos.z));
+            raw.push_back(static_cast<float>(relVel.x));
+            raw.push_back(static_cast<float>(relVel.y));
+            raw.push_back(static_cast<float>(relVel.z));
+        } else {
+            for (int k = 0; k < 6; ++k) raw.push_back(0.0f);
+        }
     }
 
     // 75..76: Heading sine and cosine
@@ -192,9 +220,10 @@ std::vector<float> ONNXNavigationPolicy::buildRawObservation(
 
 std::vector<float> ONNXNavigationPolicy::buildNormalizedObservation(
     const UAVState& uav,
-    const CityMap& map
+    const CityMap& map,
+    const std::vector<UAVState>& traffic
 ) const {
-    const auto raw = buildRawObservation(uav, map);
+    const auto raw = buildRawObservation(uav, map, traffic);
 
     const double extentX = map.worldMax.x - map.worldMin.x;
     const double extentY = map.worldMax.y - map.worldMin.y;
@@ -216,6 +245,18 @@ std::vector<float> ONNXNavigationPolicy::buildNormalizedObservation(
     scales[11] = std::max(m_config.maxPayloadMass, 1e-6);
     scales[12] = m_config.maxObservationSpeed;
 
+    const double maxRelH = 2.0 * m_config.maxHorizontalSpeed;
+    const double maxRelV = 2.0 * m_config.maxVerticalSpeed;
+    for (size_t k = 0; k < 3; ++k) {
+        size_t base = 57 + k * 6;
+        scales[base + 0] = horizDiag;
+        scales[base + 1] = horizDiag;
+        scales[base + 2] = extentZ;
+        scales[base + 3] = maxRelH;
+        scales[base + 4] = maxRelH;
+        scales[base + 5] = maxRelV;
+    }
+
     std::vector<float> normalized(87);
     for (size_t i = 0; i < 87; ++i) {
         float scaled = static_cast<float>(raw[i] / scales[i]);
@@ -231,7 +272,16 @@ VelocityCommand ONNXNavigationPolicy::computeAction(
     const CityMap& map,
     double dt
 ) const {
-    const auto normObs = buildNormalizedObservation(uav, map);
+    return computeActionWithTraffic(uav, map, {}, dt);
+}
+
+VelocityCommand ONNXNavigationPolicy::computeActionWithTraffic(
+    const UAVState& uav,
+    const CityMap& map,
+    const std::vector<UAVState>& traffic,
+    double dt
+) const {
+    const auto normObs = buildNormalizedObservation(uav, map, traffic);
     const auto action = m_model->run(normObs);
 
     const float a0 = std::clamp(action[0], -1.0f, 1.0f);

@@ -330,7 +330,7 @@ int main(int argc, char* argv[]) {
     bool logEvents = false;
     bool exportMetrics = true;
 
-    bool useOnnxNav = false;
+    bool useOnnxNav = true;
     std::string navPolicyPath = "models/navigation/nav_policy.onnx";
     std::string normPath = "models/navigation/normalization.json";
     bool useSafety = true;
@@ -363,6 +363,8 @@ int main(int argc, char* argv[]) {
             outputDir = argv[++i];
         } else if (arg == "--onnx-nav") {
             useOnnxNav = true;
+        } else if (arg == "--heuristic-nav") {
+            useOnnxNav = false;
         } else if (arg == "--nav-policy" && i + 1 < argc) {
             navPolicyPath = argv[++i];
             useOnnxNav = true;
@@ -435,15 +437,17 @@ int main(int argc, char* argv[]) {
     navConfig.maxVerticalSpeed = config.fleet.maxVerticalSpeed;
     WaypointController navigator(navConfig);
 
+    SafetyLayerConfig safetyCfg;
+    if (!useSafety) {
+        safetyCfg.safetyMargin = 0.0;
+        safetyCfg.lookaheadTime = 0.0;
+    }
+    SafetyLayer safetyFilter(safetyCfg);
+
     std::shared_ptr<ONNXNavigationPolicy> navPolicy;
     if (useOnnxNav) {
         std::string resolvedModel = resolveConfigPath(navPolicyPath);
         std::string resolvedNorm = resolveConfigPath(normPath);
-        SafetyLayerConfig safetyCfg;
-        if (!useSafety) {
-            safetyCfg.safetyMargin = 0.0;
-            safetyCfg.lookaheadTime = 0.0;
-        }
         try {
             navPolicy = std::make_shared<ONNXNavigationPolicy>(resolvedModel, resolvedNorm, safetyCfg);
             std::cout << "[System] Navigation Engine: Trained ONNX Actor (" << resolvedModel << ")\n";
@@ -642,10 +646,13 @@ int main(int argc, char* argv[]) {
                     uav.mode == UAVMode::FLYING_TO_DESTINATION ||
                     uav.mode == UAVMode::RETURNING_TO_CHARGE) {
                     if (navPolicy) {
-                        action = navPolicy->computeAction(uav, map, dt);
+                        action = navPolicy->computeActionWithTraffic(uav, map, trafficSnapshot, dt);
                         action = navigator.applyTrafficAvoidance(uav, action, trafficSnapshot);
                     } else {
                         action = navigator.computeActionWithTraffic(uav, map, trafficSnapshot, dt);
+                    }
+                    if (useSafety) {
+                        action = safetyFilter.filterAction(uav, map, action, dt);
                     }
                 }
                 integrator.stepVelocityCommand(uav, action, dt);

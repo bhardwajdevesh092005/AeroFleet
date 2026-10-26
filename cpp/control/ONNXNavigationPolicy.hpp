@@ -46,6 +46,13 @@ public:
         double dt
     ) const override;
 
+    [[nodiscard]] VelocityCommand computeActionWithTraffic(
+        const UAVState& uav,
+        const CityMap& map,
+        const std::vector<UAVState>& traffic,
+        double dt
+    ) const;
+
     [[nodiscard]] const ONNXModel& getModel() const noexcept { return *m_model; }
     [[nodiscard]] const SafetyLayer& getSafetyLayer() const noexcept { return m_safetyLayer; }
     [[nodiscard]] SafetyLayer& getSafetyLayer() noexcept { return m_safetyLayer; }
@@ -54,12 +61,14 @@ public:
 
     [[nodiscard]] std::vector<float> buildRawObservation(
         const UAVState& uav,
-        const CityMap& map
+        const CityMap& map,
+        const std::vector<UAVState>& traffic = {}
     ) const;
 
     [[nodiscard]] std::vector<float> buildNormalizedObservation(
         const UAVState& uav,
-        const CityMap& map
+        const CityMap& map,
+        const std::vector<UAVState>& traffic = {}
     ) const;
 
 private:

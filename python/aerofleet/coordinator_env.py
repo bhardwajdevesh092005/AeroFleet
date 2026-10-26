@@ -52,6 +52,7 @@ class AeroFleetCoordinatorEnv(gym.Env):
         w_assign_bonus: float = 0.5,
         w_emergency: float = 30.0,
         w_charging_bonus: float = 2.0,
+        w_collision: float = 100.0,
         min_battery_dispatch_percent: float = 25.0,
     ) -> None:
         super().__init__()
@@ -70,6 +71,7 @@ class AeroFleetCoordinatorEnv(gym.Env):
         self._w_assign_bonus = w_assign_bonus
         self._w_emergency = w_emergency
         self._w_charging_bonus = w_charging_bonus
+        self._w_collision = w_collision
         self._min_battery_dispatch_percent = min_battery_dispatch_percent
 
         self._sim = Simulator(self._config_path)
@@ -246,6 +248,7 @@ class AeroFleetCoordinatorEnv(gym.Env):
         snap_before = self._sim.get_snapshot()
         delivered_before = snap_before.metrics.total_delivered
         expired_before = snap_before.metrics.total_expired
+        collisions_before = snap_before.metrics.collision_count
         emergencies_before = sum(1 for u in snap_before.uavs if u.mode == UAVMode.EMERGENCY)
 
         # Advance simulation by decision interval
@@ -255,6 +258,7 @@ class AeroFleetCoordinatorEnv(gym.Env):
         snap_after = self._sim.get_snapshot()
         delta_delivered = snap_after.metrics.total_delivered - delivered_before
         delta_expired = snap_after.metrics.total_expired - expired_before
+        delta_collisions = max(0, snap_after.metrics.collision_count - collisions_before)
         emergencies_after = sum(1 for u in snap_after.uavs if u.mode == UAVMode.EMERGENCY)
         delta_emergencies = max(0, emergencies_after - emergencies_before)
 
@@ -277,6 +281,7 @@ class AeroFleetCoordinatorEnv(gym.Env):
         reward += self._w_delivered * delta_delivered
         reward -= self._w_expired * delta_expired
         reward -= self._w_emergency * delta_emergencies
+        reward -= self._w_collision * delta_collisions
         reward -= 2.0 * dangerously_low
         reward += self._w_charging_bonus * charged_drones
         reward -= self._w_wait * total_wait_time
@@ -292,9 +297,11 @@ class AeroFleetCoordinatorEnv(gym.Env):
             "delta_delivered": delta_delivered,
             "delta_expired": delta_expired,
             "delta_emergencies": delta_emergencies,
+            "delta_collisions": delta_collisions,
             "total_delivered": snap_after.metrics.total_delivered,
             "total_expired": snap_after.metrics.total_expired,
             "total_emergencies": emergencies_after,
+            "total_collisions": snap_after.metrics.collision_count,
             "charged_drones": charged_drones,
             "pending_count": len(pending_after),
             "success_rate": snap_after.metrics.delivery_success_rate,

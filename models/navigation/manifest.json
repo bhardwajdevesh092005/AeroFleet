@@ -14,7 +14,7 @@
   "total_timesteps": 208896,
   "normalization_file": "normalization.json",
   "onnx_file": "nav_policy.onnx",
-  "onnx_sha256": "ff776157dfc8692757c29ace73c2eb6bc29d1b89e08a7bdc3baa1cad23a5b9c9",
+  "onnx_sha256": "5460f236b33a2a46f3015838b317f9eabc7adccb614ae9c06ae6fd4c8b4e2398",
   "onnx_opset_version": 17,
-  "git_commit": "f43c252ba74e59e8a3a9ba2b33c6d2746e869263"
+  "git_commit": "194f7c47b4de084ec35a6ae8f59cebb9cabb58f5"
 }

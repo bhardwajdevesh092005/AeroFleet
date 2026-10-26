@@ -332,7 +332,7 @@ StepResult Simulator::step(const std::vector<VelocityCommand>& actions) {
             ? computeNavigationReward(uav, prevUav, succeeded, failed, actualStepDuration)
             : computeReward(uav, prevUav, reached, crashed));
         result.terminated.push_back(
-            (m_navigationTask && m_navigationTaskSucceeded) || uav.mode == UAVMode::EMERGENCY || uav.batteryPercent <= 0.0
+            (m_navigationTask && (m_navigationTaskSucceeded || failed)) || uav.mode == UAVMode::EMERGENCY || uav.batteryPercent <= 0.0
         );
         result.truncated.push_back(false);
     }
@@ -547,7 +547,7 @@ float Simulator::computeReward(const UAVState& uav, const UAVState& prevUav, boo
     float reward = -0.01f; // Living penalty to incentivize timely completion
 
     if (crashed) {
-        reward -= 50.0f;
+        reward -= 100.0f;
     }
 
     if (reached) {
@@ -580,7 +580,19 @@ float Simulator::computeNavigationReward(
 
     float reward = -0.01f + static_cast<float>(0.1 * progress);
     if (succeeded) reward += 10.0f;
-    if (failed) reward -= 10.0f;
+    if (failed) reward -= 100.0f;
+
+    // Continuous LiDAR proximity penalty to discourage flying within 3.5m of obstacles
+    auto beams = computeLidarBeams(uav.position, uav.yaw, 100.0);
+    float minBeam = 1.0f;
+    for (float b : beams) {
+        if (b < minBeam) minBeam = b;
+    }
+    double minObsDist = static_cast<double>(minBeam) * 100.0;
+    if (minObsDist < 3.5) {
+        reward -= static_cast<float>(0.4 * (3.5 - minObsDist));
+    }
+
     return reward;
 }
 
