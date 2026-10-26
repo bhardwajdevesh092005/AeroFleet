@@ -130,6 +130,12 @@ public:
 
     void setSeed(uint64_t seed) { m_config.simulation.randomSeed = seed; reset(seed); }
 
+    void setBatteryDischargeMultiplier(double mult) { m_fleet.setBatteryDischargeMultiplier(mult); }
+    [[nodiscard]] double getBatteryDischargeMultiplier() const { return m_fleet.getBatteryDischargeMultiplier(); }
+    void setUAVBatteryPercent(UAVId id, double percent) { m_fleet.setUAVBatteryPercent(id, percent); }
+    [[nodiscard]] double getUAVBatteryPercent(UAVId id) const { return m_fleet.getUAVBatteryPercent(id); }
+    [[nodiscard]] UAVMode getUAVMode(UAVId id) const { return m_fleet.getUAV(id).mode; }
+
 private:
     SimulationConfig m_config;
     CityMap m_map;

@@ -9,12 +9,12 @@
     "max_simulation_time": 3600.0
   },
   "world": {
-    "x_min": -500.0,
-    "x_max": 500.0,
-    "y_min": -500.0,
-    "y_max": 500.0,
+    "x_min": -1000.0,
+    "x_max": 1000.0,
+    "y_min": -1000.0,
+    "y_max": 1000.0,
     "z_min": 0.0,
-    "z_max": 150.0,
+    "z_max": 200.0,
     "default_spawn_altitude": 15.0,
     "safety_margin": 2.0
   },

@@ -67,6 +67,7 @@ SimulationConfig SimulationConfig::fromJson(const JsonValue& root) {
         config.energy.dragCoefficient = e.getOrDefault<double>("drag_coefficient", config.energy.dragCoefficient);
         config.energy.liftCoefficient = e.getOrDefault<double>("lift_coefficient", config.energy.liftCoefficient);
         config.energy.climbPenaltyCoefficient = e.getOrDefault<double>("climb_penalty_coefficient", config.energy.climbPenaltyCoefficient);
+        config.energy.dischargeMultiplier = e.getOrDefault<double>("discharge_multiplier", config.energy.dischargeMultiplier);
     }
 
     validate(config);
@@ -208,7 +209,8 @@ void SimulationConfig::saveToFile(const std::string& filepath) const {
         << "    \"idle_power_watts\": " << energy.idlePowerWatts << ",\n"
         << "    \"drag_coefficient\": " << energy.dragCoefficient << ",\n"
         << "    \"lift_coefficient\": " << energy.liftCoefficient << ",\n"
-        << "    \"climb_penalty_coefficient\": " << energy.climbPenaltyCoefficient << "\n"
+        << "    \"climb_penalty_coefficient\": " << energy.climbPenaltyCoefficient << ",\n"
+        << "    \"discharge_multiplier\": " << energy.dischargeMultiplier << "\n"
         << "  }\n"
         << "}\n";
 }

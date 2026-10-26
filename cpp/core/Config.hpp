@@ -74,6 +74,7 @@ struct EnergySettings {
     double dragCoefficient{0.15};           ///< Velocity aerodynamic drag penalty
     double liftCoefficient{9.81};           ///< Gravitational payload lift coefficient
     double climbPenaltyCoefficient{25.0};   ///< Upward vertical climb power penalty
+    double dischargeMultiplier{1.0};        ///< Accelerated discharge multiplier for stress testing
 };
 
 struct SimulationConfig {

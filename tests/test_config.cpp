@@ -50,8 +50,8 @@ void test_load_valid_config() {
         TEST_ASSERT(std::abs(config.simulation.dtPolicy - 0.10) < 1e-6, "dtPolicy mismatch");
         TEST_ASSERT(std::abs(config.simulation.dtCoordinator - 1.00) < 1e-6, "dtCoordinator mismatch");
         TEST_ASSERT(config.fleet.numUavs == 10, "Fleet size mismatch");
-        TEST_ASSERT(config.world.xMin == -500.0 && config.world.xMax == 500.0, "World X bounds mismatch");
-        TEST_ASSERT(config.world.zMin == 0.0 && config.world.zMax == 150.0, "World Z bounds mismatch");
+        TEST_ASSERT(config.world.xMin == -1000.0 && config.world.xMax == 1000.0, "World X bounds mismatch");
+        TEST_ASSERT(config.world.zMin == 0.0 && config.world.zMax == 200.0, "World Z bounds mismatch");
         TEST_ASSERT(config.fleet.reserveBatteryPercent > config.fleet.criticalBatteryPercent, "Battery bounds check");
     } catch (const std::exception& e) {
         TEST_ASSERT(false, std::string("Unexpected exception: ") + e.what());

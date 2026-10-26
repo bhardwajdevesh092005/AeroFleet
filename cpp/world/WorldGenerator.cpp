@@ -16,29 +16,58 @@ CityMap WorldGenerator::generate(
     map.worldMax = Vec3(settings.xMax, settings.yMax, settings.zMax);
 
     std::mt19937_64 rng(seed);
-    std::uniform_real_distribution<double> heightDist(params.minBuildingHeight, params.maxBuildingHeight);
-    std::uniform_real_distribution<double> setbackDist(2.0, 6.0);
 
     const double totalWidth = settings.xMax - settings.xMin;
     const double totalHeight = settings.yMax - settings.yMin;
 
-    const double blockWidth = (totalWidth - (params.gridBlocksX + 1) * params.streetWidth) / params.gridBlocksX;
-    const double blockHeight = (totalHeight - (params.gridBlocksY + 1) * params.streetWidth) / params.gridBlocksY;
+    // Dynamically adapt grid subdivisions if world domain is smaller than standard metropolitan scale
+    int32_t blocksX = params.gridBlocksX;
+    int32_t blocksY = params.gridBlocksY;
+    double streetW = params.streetWidth;
+
+    while (blocksX > 2 && (totalWidth - (blocksX + 1) * streetW) / blocksX < 15.0) {
+        if (streetW > 12.0) {
+            streetW *= 0.75;
+        } else {
+            blocksX--;
+        }
+    }
+    while (blocksY > 2 && (totalHeight - (blocksY + 1) * streetW) / blocksY < 15.0) {
+        blocksY--;
+    }
+
+    const double blockWidth = (totalWidth - (blocksX + 1) * streetW) / blocksX;
+    const double blockHeight = (totalHeight - (blocksY + 1) * streetW) / blocksY;
+
+    // Setback distribution: 6m to 16m for pedestrian walkways, trees, and corner plazas
+    std::uniform_real_distribution<double> setbackDist(std::min(4.0, blockWidth * 0.05), std::min(16.0, blockWidth * 0.22));
+
+    const double maxRadius = std::sqrt((totalWidth * 0.5) * (totalWidth * 0.5) + (totalHeight * 0.5) * (totalHeight * 0.5));
+    const double effectiveCeiling = (settings.zMax > settings.zMin + 20.0) ? (settings.zMax - 15.0) : settings.zMax;
 
     int32_t buildingIdCounter = 1;
 
     // Generate grid blocks with buildings
-    for (int32_t bx = 0; bx < params.gridBlocksX; ++bx) {
-        double blockXMin = settings.xMin + params.streetWidth + bx * (blockWidth + params.streetWidth);
+    for (int32_t bx = 0; bx < blocksX; ++bx) {
+        double blockXMin = settings.xMin + streetW + bx * (blockWidth + streetW);
         double blockXMax = blockXMin + blockWidth;
 
-        for (int32_t by = 0; by < params.gridBlocksY; ++by) {
-            double blockYMin = settings.yMin + params.streetWidth + by * (blockHeight + params.streetWidth);
+        for (int32_t by = 0; by < blocksY; ++by) {
+            double blockYMin = settings.yMin + streetW + by * (blockHeight + streetW);
             double blockYMax = blockYMin + blockHeight;
 
-            // Leave central plaza or occasional park empty (e.g. 1 out of 8 blocks)
-            if (bx == params.gridBlocksX / 2 && by == params.gridBlocksY / 2) {
-                continue; // Central Open Plaza
+            // 1. Central Open Plaza (contains coordinate (0, 0) for safe spawn & initial waypoint)
+            if (bx == blocksX / 2 && by == blocksY / 2) {
+                continue;
+            }
+            // 2. Municipal Parks in four quadrants for city greenery
+            if (blocksX >= 8 && blocksY >= 8) {
+                if ((bx == blocksX / 4 && by == blocksY / 4) ||
+                    (bx == 3 * blocksX / 4 && by == blocksY / 4) ||
+                    (bx == blocksX / 4 && by == 3 * blocksY / 4) ||
+                    (bx == 3 * blocksX / 4 && by == 3 * blocksY / 4)) {
+                    continue;
+                }
             }
 
             const double setback = setbackDist(rng);
@@ -46,6 +75,17 @@ CityMap WorldGenerator::generate(
             const double bMaxX = blockXMax - setback;
             const double bMinY = blockYMin + setback;
             const double bMaxY = blockYMax - setback;
+
+            // Center-to-Perimeter height gradient:
+            // Downtown CBD center has soaring skyscrapers up to 185m, tapering to 40-75m at the perimeter
+            const double blockCenterX = (blockXMin + blockXMax) * 0.5;
+            const double blockCenterY = (blockYMin + blockYMax) * 0.5;
+            const double distFromCenter = std::sqrt(blockCenterX * blockCenterX + blockCenterY * blockCenterY);
+            const double distNorm = std::min(1.0, distFromCenter / (maxRadius * 0.82));
+
+            const double targetMaxH = std::min(effectiveCeiling, params.maxBuildingHeight * (1.0 - distNorm * 0.58));
+            const double targetMinH = std::max(params.minBuildingHeight, targetMaxH * 0.55);
+            std::uniform_real_distribution<double> heightDist(targetMinH, targetMaxH);
             const double bHeight = heightDist(rng);
 
             if (bMaxX > bMinX + 5.0 && bMaxY > bMinY + 5.0) {
@@ -56,12 +96,13 @@ CityMap WorldGenerator::generate(
     }
 
     // Build spatial hash broadphase
-    map.rebuildBroadphase(50.0);
+    map.rebuildBroadphase(40.0);
 
     // Generate Store Locations along open street corridors
     int32_t storeIdCounter = 1;
-    std::uniform_real_distribution<double> xCoordDist(settings.xMin + 50.0, settings.xMax - 50.0);
-    std::uniform_real_distribution<double> yCoordDist(settings.yMin + 50.0, settings.yMax - 50.0);
+    const double margin = std::min(50.0, totalWidth * 0.15);
+    std::uniform_real_distribution<double> xCoordDist(settings.xMin + margin, settings.xMax - margin);
+    std::uniform_real_distribution<double> yCoordDist(settings.yMin + margin, settings.yMax - margin);
 
     for (int32_t s = 0; s < params.numStores; ++s) {
         Vec3 storePos;

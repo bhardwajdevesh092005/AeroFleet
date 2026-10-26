@@ -8,14 +8,14 @@
 namespace aerofleet {
 
 struct GenerationParameters {
-    int32_t gridBlocksX{6};
-    int32_t gridBlocksY{6};
-    double streetWidth{25.0};
-    double minBuildingHeight{15.0};
-    double maxBuildingHeight{80.0};
-    int32_t numStores{4};
-    int32_t numCustomers{20};
-    int32_t numChargingStations{4};
+    int32_t gridBlocksX{14};
+    int32_t gridBlocksY{14};
+    double streetWidth{24.0};
+    double minBuildingHeight{35.0};
+    double maxBuildingHeight{185.0};
+    int32_t numStores{6};
+    int32_t numCustomers{30};
+    int32_t numChargingStations{6};
 };
 
 class WorldGenerator {
