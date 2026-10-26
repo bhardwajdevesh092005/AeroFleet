@@ -351,7 +351,7 @@ def test_independent_analytical_kinematics_trajectory():
 def test_boundary_collision_differential_parity():
     """Verifies that world boundary breaches terminate identically in direct C++ and Gym env."""
     config = "config/simulation.json"
-    start = [490.0, 0.0, 20.0]  # 10m from Eastern world boundary (X_max = 500.0)
+    start = [990.0, 0.0, 20.0]  # 10m from Eastern world boundary (X_max = 1000.0)
     target = [0.0, 0.0, 20.0]
     initial_yaw = 0.0
 
