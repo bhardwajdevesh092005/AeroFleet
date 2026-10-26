@@ -96,6 +96,11 @@ public:
     [[nodiscard]] const BatteryModel& getBatteryModel() const noexcept { return m_batteryModel; }
     [[nodiscard]] const FleetSettings& getSettings() const noexcept { return m_settings; }
 
+    void setBatteryDischargeMultiplier(double mult) noexcept { m_batteryModel.setDischargeMultiplier(mult); }
+    [[nodiscard]] double getBatteryDischargeMultiplier() const noexcept { return m_batteryModel.getDischargeMultiplier(); }
+    void setUAVBatteryPercent(UAVId id, double percent);
+    [[nodiscard]] double getUAVBatteryPercent(UAVId id) const;
+
 private:
     FleetSettings m_settings;
     EnergySettings m_energySettings;

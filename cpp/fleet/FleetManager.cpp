@@ -176,6 +176,17 @@ void FleetManager::step(
                 uav.acceleration = Vec3(0.0, 0.0, 0.0);
                 continue;
             }
+        } else if (m_batteryModel.isReserve(uav.batteryPercent)) {
+            // Reserve battery low-power trigger: in-flight RTH safety abort
+            if (uav.mode == UAVMode::ASSIGNED ||
+                uav.mode == UAVMode::FLYING_TO_PICKUP ||
+                uav.mode == UAVMode::PICKING_UP) {
+                DeliveryRequest req;
+                if (abortAssignment(uav.id, req)) {
+                    outRequeuedRequests.push_back(req);
+                }
+                uav.mode = UAVMode::RETURNING_TO_CHARGE;
+            }
         }
 
         // 2. State-specific lifecycle transitions
@@ -207,7 +218,26 @@ void FleetManager::step(
                     uav.mode = UAVMode::RETURNING_TO_CHARGE;
                 }
                 break;
-            case UAVMode::EMERGENCY:
+            case UAVMode::EMERGENCY: {
+                if (uav.batteryPercent >= 80.0) {
+                    uav.mode = UAVMode::IDLE;
+                    uav.velocity = Vec3(0, 0, 0);
+                    uav.acceleration = Vec3(0, 0, 0);
+                } else {
+                    for (auto& s : map.chargingStations) {
+                        if (m_batteryModel.isInDockingRange(uav, s)) {
+                            uav.velocity = Vec3(0, 0, 0);
+                            uav.acceleration = Vec3(0, 0, 0);
+                            if (m_batteryModel.dock(uav, s)) {
+                                ctx.targetChargerId = s.id;
+                                uav.mode = UAVMode::CHARGING;
+                                break;
+                            }
+                        }
+                    }
+                }
+                break;
+            }
             case UAVMode::OFFLINE:
             default:
                 break;
@@ -229,6 +259,11 @@ void FleetManager::handleFlyingToPickup(UAVState& uav, UAVContext& ctx, const Ci
     if (uav.position.z < 10.0) {
         // Maintain vertical climb corridor to clear ground charging station
         uav.targetWaypoint = Vec3(ctx.homeBasePosition.x, ctx.homeBasePosition.y, 15.0);
+        return;
+    }
+
+    if (ctx.activeRequest.id == -1 || ctx.assignedRequestId == -1) {
+        uav.mode = UAVMode::IDLE;
         return;
     }
 
@@ -255,6 +290,11 @@ void FleetManager::handleFlyingToPickup(UAVState& uav, UAVContext& ctx, const Ci
 }
 
 void FleetManager::handlePickingUp(UAVState& uav, UAVContext& ctx, double dt, double currentTime) {
+    if (ctx.activeRequest.id == -1 || ctx.assignedRequestId == -1) {
+        uav.mode = UAVMode::IDLE;
+        return;
+    }
+
     ctx.dwellTimer += dt;
     if (ctx.activeRequest.status == RequestStatus::ASSIGNED) {
         ctx.activeRequest.transitionTo(RequestStatus::PICKING_UP, currentTime);
@@ -270,6 +310,21 @@ void FleetManager::handlePickingUp(UAVState& uav, UAVContext& ctx, double dt, do
 }
 
 void FleetManager::handleFlyingToDestination(UAVState& uav, UAVContext& ctx, const CityMap& map, double /*dt*/) {
+    if (ctx.activeRequest.id == -1 || ctx.assignedRequestId == -1) {
+        // Waypoint navigation without delivery request (e.g., flight demo or repositioning)
+        double dist = uav.position.distance(uav.targetWaypoint);
+        if (dist <= 3.0) {
+            uav.velocity = Vec3(0.0, 0.0, 0.0);
+            if (m_batteryModel.isReserve(uav.batteryPercent)) {
+                uav.mode = UAVMode::RETURNING_TO_CHARGE;
+            } else {
+                uav.mode = UAVMode::IDLE;
+                uav.targetWaypoint = ctx.homeBasePosition;
+            }
+        }
+        return;
+    }
+
     const Vec3& dropoff = ctx.activeRequest.dropoffLocation;
     double maxBuildingHeight = 0.0;
     for (const auto& b : map.buildings) {
@@ -302,8 +357,10 @@ void FleetManager::handleDroppingOff(
     ctx.dwellTimer += dt;
     if (ctx.dwellTimer >= m_settings.dropoffDwellSeconds) {
         uav.payloadMass = 0.0;
-        ctx.activeRequest.transitionTo(RequestStatus::DELIVERED, currentTime);
-        outDelivered.push_back(ctx.activeRequest);
+        if (ctx.activeRequest.id != -1 && ctx.activeRequest.canTransitionTo(RequestStatus::DELIVERED)) {
+            ctx.activeRequest.transitionTo(RequestStatus::DELIVERED, currentTime);
+            outDelivered.push_back(ctx.activeRequest);
+        }
 
         uav.activeRequestId = -1;
         ctx.assignedRequestId = -1;
@@ -351,7 +408,9 @@ void FleetManager::handleReturningToCharge(UAVState& uav, UAVContext& ctx, CityM
             uav.targetWaypoint = targetStation->position;
         }
 
-        if (m_batteryModel.isInDockingRange(uav, *targetStation) && uav.speed() <= 2.0) {
+        if (m_batteryModel.isInDockingRange(uav, *targetStation)) {
+            uav.velocity = Vec3(0, 0, 0);
+            uav.acceleration = Vec3(0, 0, 0);
             if (m_batteryModel.dock(uav, *targetStation)) {
                 uav.mode = UAVMode::CHARGING;
             }
@@ -394,6 +453,25 @@ size_t FleetManager::countInMode(UAVMode mode) const noexcept {
         if (u.mode == mode) count++;
     }
     return count;
+}
+
+void FleetManager::setUAVBatteryPercent(UAVId id, double percent) {
+    if (static_cast<size_t>(id) < m_uavs.size()) {
+        auto& u = m_uavs[static_cast<size_t>(id)];
+        u.batteryPercent = std::clamp(percent, 0.0, 100.0);
+        if (u.batteryPercent >= 80.0 && (u.mode == UAVMode::EMERGENCY || u.mode == UAVMode::RETURNING_TO_CHARGE)) {
+            u.mode = UAVMode::IDLE;
+            u.velocity = Vec3(0, 0, 0);
+            u.acceleration = Vec3(0, 0, 0);
+        }
+    }
+}
+
+double FleetManager::getUAVBatteryPercent(UAVId id) const {
+    if (static_cast<size_t>(id) < m_uavs.size()) {
+        return m_uavs[static_cast<size_t>(id)].batteryPercent;
+    }
+    return 0.0;
 }
 
 } // namespace aerofleet

@@ -42,7 +42,7 @@ double BatteryModel::stepDischarge(UAVState& uav, double dt) const {
         return 0.0;
     }
 
-    const double powerWatts = computePowerWatts(uav.velocity, uav.payloadMass);
+    const double powerWatts = computePowerWatts(uav.velocity, uav.payloadMass) * m_config.dischargeMultiplier;
     const double energyJoules = powerWatts * dt;
     const double capacityJoules = m_config.totalCapacityJoules();
 

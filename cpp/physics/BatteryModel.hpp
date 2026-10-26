@@ -29,6 +29,7 @@ struct BatteryConfig {
     double liftCoefficient{9.81};           ///< Gravitational payload lift coefficient
     double climbPenaltyCoefficient{25.0};   ///< Upward vertical climb power penalty coefficient
     double gravity{9.81};                   ///< Standard gravitational acceleration (m/s^2)
+    double dischargeMultiplier{1.0};        ///< Accelerated discharge scaling factor
 
     BatteryConfig() = default;
 
@@ -45,7 +46,8 @@ struct BatteryConfig {
           dragCoefficient(energy.dragCoefficient),
           liftCoefficient(energy.liftCoefficient),
           climbPenaltyCoefficient(energy.climbPenaltyCoefficient),
-          gravity(9.81) {}
+          gravity(9.81),
+          dischargeMultiplier(energy.dischargeMultiplier) {}
 
     /**
      * @brief Total battery stored energy capacity in Joules (Watt-seconds).
@@ -135,6 +137,8 @@ public:
     }
 
     [[nodiscard]] const BatteryConfig& getConfig() const noexcept { return m_config; }
+    void setDischargeMultiplier(double mult) noexcept { m_config.dischargeMultiplier = std::max(0.0, mult); }
+    [[nodiscard]] double getDischargeMultiplier() const noexcept { return m_config.dischargeMultiplier; }
 
 private:
     BatteryConfig m_config;
