@@ -101,23 +101,34 @@ void CameraController::update(double dt, const WorldSnapshot& snapshot) {
     switch (m_mode) {
         case CameraMode::ORBIT: {
             const Vec3 idealPos = computeOrbitPosition(m_target, m_distance, m_azimuth, m_elevation);
-            const double lerpFactor = MathUtils::clamp(dt * 6.0, 0.05, 1.0);
-            m_position = m_position.lerp(idealPos, lerpFactor);
+            if (m_targetChanged) {
+                m_position = idealPos;
+                m_targetChanged = false;
+            } else {
+                const double lerpFactor = MathUtils::clamp(dt * 6.0, 0.05, 1.0);
+                m_position = m_position.lerp(idealPos, lerpFactor);
+            }
             m_up = Vec3(0.0, 0.0, 1.0);
             break;
         }
         case CameraMode::CHASE: {
             const auto* uav = snapshot.findUAV(m_chaseTargetId);
             if (uav) {
-                // Tighter chase distance (14m behind, 5m above) with slight velocity look-ahead
-                const Vec3 lookAhead = uav->velocity * 0.5;
-                const Vec3 idealPos = computeChasePosition(uav->position, uav->yaw, m_chaseDistance, m_chaseHeight);
+                // Tighter chase distance with slight velocity look-ahead and proportional altitude
+                const Vec3 lookAhead = uav->velocity * 0.4;
+                const double currentHeight = std::max(2.5, m_chaseDistance * 0.38);
+                const Vec3 idealPos = computeChasePosition(uav->position, uav->yaw, m_chaseDistance, currentHeight);
                 const Vec3 idealTarget = uav->position + Vec3(0.0, 0.0, 1.0) + lookAhead;
 
-                // Smooth camera dampening (no snapping)
-                const double lerpFactor = MathUtils::clamp(dt * 7.0, 0.08, 1.0);
-                m_position = m_position.lerp(idealPos, lerpFactor);
-                m_target = m_target.lerp(idealTarget, lerpFactor);
+                if (m_targetChanged) {
+                    m_position = idealPos;
+                    m_target = idealTarget;
+                    m_targetChanged = false;
+                } else {
+                    const double lerpFactor = MathUtils::clamp(dt * 7.0, 0.08, 1.0);
+                    m_position = m_position.lerp(idealPos, lerpFactor);
+                    m_target = m_target.lerp(idealTarget, lerpFactor);
+                }
                 m_up = Vec3(0.0, 0.0, 1.0);
             } else {
                 m_position = computeOrbitPosition(m_target, m_distance, m_azimuth, m_elevation);
@@ -127,9 +138,11 @@ void CameraController::update(double dt, const WorldSnapshot& snapshot) {
         case CameraMode::TOP_DOWN: {
             m_position = Vec3(m_target.x, m_target.y + 0.001, m_target.z + m_topDownAltitude);
             m_up = Vec3(0.0, 1.0, 0.0); // Up points North in top-down view
+            m_targetChanged = false;
             break;
         }
         case CameraMode::FREE: {
+            m_targetChanged = false;
             break;
         }
     }

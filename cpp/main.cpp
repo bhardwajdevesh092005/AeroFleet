@@ -764,7 +764,8 @@ int main(int argc, char* argv[]) {
             }
             if (IsKeyPressed(KEY_ZERO)) {
                 camera.setMode(aerofleet::CameraMode::ORBIT);
-                renderer.addToast("Camera: ORBIT", Color{56, 189, 248, 255});
+                camera.setTarget(Vec3(0.0, 0.0, 15.0));
+                renderer.addToast("Camera: ORBIT (Downtown Center)", Color{56, 189, 248, 255});
             }
             WorldSnapshot renderSnapshot = WorldSnapshot::interpolate(prevSnapshot, currSnapshot, clock.getAlpha());
             renderer.draw(renderSnapshot, map, camera);

@@ -45,15 +45,18 @@ inline Color lerpColor(Color a, Color b, float t) noexcept {
 struct CityMeshBuilder {
     std::vector<float> vertices;
     std::vector<float> normals;
+    std::vector<float> texcoords;
     std::vector<unsigned char> colors;
 
-    void addVertex(float x, float y, float z, float nx, float ny, float nz, Color c) {
+    void addVertex(float x, float y, float z, float nx, float ny, float nz, Color c, float u = 0.0f, float v = 0.0f) {
         vertices.push_back(x);
         vertices.push_back(y);
         vertices.push_back(z);
         normals.push_back(nx);
         normals.push_back(ny);
         normals.push_back(nz);
+        texcoords.push_back(u);
+        texcoords.push_back(v);
         colors.push_back(c.r);
         colors.push_back(c.g);
         colors.push_back(c.b);
@@ -63,14 +66,14 @@ struct CityMeshBuilder {
     void addQuad(Vector3 v0, Vector3 v1, Vector3 v2, Vector3 v3, Vector3 norm,
                  Color c0, Color c1, Color c2, Color c3) {
         // Triangle 1: v0 -> v1 -> v2
-        addVertex(v0.x, v0.y, v0.z, norm.x, norm.y, norm.z, c0);
-        addVertex(v1.x, v1.y, v1.z, norm.x, norm.y, norm.z, c1);
-        addVertex(v2.x, v2.y, v2.z, norm.x, norm.y, norm.z, c2);
+        addVertex(v0.x, v0.y, v0.z, norm.x, norm.y, norm.z, c0, 0.0f, 0.0f);
+        addVertex(v1.x, v1.y, v1.z, norm.x, norm.y, norm.z, c1, 1.0f, 0.0f);
+        addVertex(v2.x, v2.y, v2.z, norm.x, norm.y, norm.z, c2, 1.0f, 1.0f);
 
         // Triangle 2: v0 -> v2 -> v3
-        addVertex(v0.x, v0.y, v0.z, norm.x, norm.y, norm.z, c0);
-        addVertex(v2.x, v2.y, v2.z, norm.x, norm.y, norm.z, c2);
-        addVertex(v3.x, v3.y, v3.z, norm.x, norm.y, norm.z, c3);
+        addVertex(v0.x, v0.y, v0.z, norm.x, norm.y, norm.z, c0, 0.0f, 0.0f);
+        addVertex(v2.x, v2.y, v2.z, norm.x, norm.y, norm.z, c2, 1.0f, 1.0f);
+        addVertex(v3.x, v3.y, v3.z, norm.x, norm.y, norm.z, c3, 0.0f, 1.0f);
     }
 
     void addQuad(Vector3 v0, Vector3 v1, Vector3 v2, Vector3 v3, Vector3 norm, Color color) {
@@ -103,9 +106,9 @@ struct CityMeshBuilder {
         // Right (X+)
         addQuad(c101, c100, c110, c111, Vector3{1, 0, 0}, colorBottom, colorBottom, colorTop, colorTop);
         // Top (Y+)
-        addQuad(c011, c111, c110, c010, Vector3{0, 1, 0}, colorTop, colorTop, colorTop, colorTop);
+        addQuad(c010, c110, c111, c011, Vector3{0, 1, 0}, colorTop, colorTop, colorTop, colorTop);
         // Bottom (Y-)
-        addQuad(c000, c100, c101, c001, Vector3{0, -1, 0}, colorBottom, colorBottom, colorBottom, colorBottom);
+        addQuad(c000, c001, c101, c100, Vector3{0, -1, 0}, colorBottom, colorBottom, colorBottom, colorBottom);
     }
 
     void addBox(Vector3 center, float sx, float sy, float sz, Color color) {
@@ -122,6 +125,9 @@ struct CityMeshBuilder {
 
         mesh.normals = static_cast<float*>(MemAlloc(normals.size() * sizeof(float)));
         std::memcpy(mesh.normals, normals.data(), normals.size() * sizeof(float));
+
+        mesh.texcoords = static_cast<float*>(MemAlloc(texcoords.size() * sizeof(float)));
+        std::memcpy(mesh.texcoords, texcoords.data(), texcoords.size() * sizeof(float));
 
         mesh.colors = static_cast<unsigned char*>(MemAlloc(colors.size() * sizeof(unsigned char)));
         std::memcpy(mesh.colors, colors.data(), colors.size() * sizeof(unsigned char));
@@ -701,6 +707,9 @@ void Renderer::draw(const WorldSnapshot& snapshot, const CityMap& map, CameraCon
 
     BeginDrawing();
 
+    // Clear color and depth buffers completely for current frame
+    ClearBackground(m_currentTheme.skyHorizon);
+
     // 1. Vertical Gradient Atmospheric Sky
     drawSkyAndAtmosphere(camera);
 
@@ -717,8 +726,10 @@ void Renderer::draw(const WorldSnapshot& snapshot, const CityMap& map, CameraCon
 
 void Renderer::drawSkyAndAtmosphere(const CameraController& camera) {
     (void)camera;
-    // Vertical 2D gradient sky dome (Zenith to Horizon)
-    DrawRectangleGradientV(0, 0, m_config.screenWidth, m_config.screenHeight,
+    // Vertical 2D gradient sky dome (Zenith to Horizon) across full window dimensions
+    const int screenW = GetScreenWidth();
+    const int screenH = GetScreenHeight();
+    DrawRectangleGradientV(0, 0, screenW, screenH,
                            m_currentTheme.skyZenith, m_currentTheme.skyHorizon);
 }
 
@@ -729,11 +740,14 @@ void Renderer::draw3DScene(const WorldSnapshot& snapshot, const CityMap& map, co
     rlSetClipPlanes(1.0, 25000.0);
     BeginMode3D(rayCam);
 
+    // Disable backface culling to ensure geometry is never clipped regardless of viewing angle
+    rlDisableBackfaceCulling();
+
     // 1. Regional terrain basin & outer ring expressway
     drawExtendedHorizonTerrain(map);
 
     // 2. High-Performance Static Merged City Model (1 Draw Call!)
-    if (m_cityModelsLoaded) {
+    if (m_cityModelsLoaded && m_cityModelDay.meshCount > 0 && m_cityModelNight.meshCount > 0) {
         Model activeModel = (m_themeMode == VisualThemeMode::DAY) ? m_cityModelDay : m_cityModelNight;
         DrawModel(activeModel, Vector3{0, 0, 0}, 1.0f, WHITE);
     } else {
@@ -1114,9 +1128,11 @@ void Renderer::drawDroneScreenBillboard(const UAVState& uav, const CameraControl
                            (camPos.z - pos.z) * (camPos.z - pos.z));
     if (dist > 1800.0f) return; // Far distance culling
 
+    const int screenW = GetScreenWidth();
+    const int screenH = GetScreenHeight();
     Vector2 screenPos = GetWorldToScreen(pos, camera.getRaylibCamera());
-    if (screenPos.x < 10 || screenPos.x > m_config.screenWidth - 10 ||
-        screenPos.y < 50 || screenPos.y > m_config.screenHeight - 30) {
+    if (screenPos.x < 10 || screenPos.x > screenW - 10 ||
+        screenPos.y < 50 || screenPos.y > screenH - 30) {
         return;
     }
 
@@ -1159,9 +1175,10 @@ void Renderer::drawHUD(const WorldSnapshot& snapshot, const CityMap& map, const 
 
 void Renderer::drawTopStatusBar(const WorldSnapshot& snapshot, const CameraController& camera) {
     (void)camera;
+    const int screenW = GetScreenWidth();
     const int barH = 46;
-    DrawRectangle(0, 0, m_config.screenWidth, barH, Color{10, 15, 26, 240});
-    DrawLine(0, barH, m_config.screenWidth, barH, Color{56, 189, 248, 80});
+    DrawRectangle(0, 0, screenW, barH, Color{10, 15, 26, 240});
+    DrawLine(0, barH, screenW, barH, Color{56, 189, 248, 80});
 
     // Zone 1: Branding Logo & Version
     drawTextSans("AEROFLEET", 20, 12, 22, Color{56, 189, 248, 255}, true);
@@ -1191,7 +1208,7 @@ void Renderer::drawTopStatusBar(const WorldSnapshot& snapshot, const CameraContr
     drawKpiChip(m_hudCache.drainStr, Color{245, 205, 35, 255}, 90);
 
     // Zone 4: Right Controls Status (Theme, Quality, FPS)
-    int rightX = m_config.screenWidth - 260;
+    int rightX = screenW - 260;
     std::string themeTag = (m_themeMode == VisualThemeMode::NIGHT) ? "🌙 NIGHT" : "☀️ DAY";
     DrawRectangleRounded(Rectangle{static_cast<float>(rightX), 10, 80, 26}, 0.4f, 4, Color{30, 41, 59, 230});
     drawTextSans(themeTag.c_str(), rightX + 8, 16, 11, Color{245, 205, 35, 255}, true);
@@ -1270,10 +1287,11 @@ void Renderer::drawDroneTelemetryPanel(const WorldSnapshot& snapshot) {
 void Renderer::drawFleetBatteryOverview(const WorldSnapshot& snapshot, CameraController& camera) {
     if (snapshot.uavs.empty()) return;
 
+    const int screenW = GetScreenWidth();
     const int panelW = 260;
     const int itemH = 21;
     const int panelH = 36 + static_cast<int>(snapshot.uavs.size()) * itemH;
-    const int panelX = m_config.screenWidth - panelW - 20;
+    const int panelX = screenW - panelW - 20;
     const int panelY = 60;
 
     DrawRectangleRounded(Rectangle{static_cast<float>(panelX), static_cast<float>(panelY), static_cast<float>(panelW), static_cast<float>(panelH)}, 0.08f, 6, Color{10, 16, 30, 230});
@@ -1335,9 +1353,11 @@ void Renderer::drawFleetBatteryOverview(const WorldSnapshot& snapshot, CameraCon
 }
 
 void Renderer::drawMinimap(const WorldSnapshot& snapshot, const CityMap& map, const CameraController& camera) {
+    const int screenW = GetScreenWidth();
+    const int screenH = GetScreenHeight();
     const int mapSize = 190;
-    const int mapX = m_config.screenWidth - mapSize - 20;
-    const int mapY = m_config.screenHeight - mapSize - 44;
+    const int mapX = screenW - mapSize - 20;
+    const int mapY = screenH - mapSize - 44;
 
     DrawRectangleRounded(Rectangle{static_cast<float>(mapX), static_cast<float>(mapY), static_cast<float>(mapSize), static_cast<float>(mapSize)}, 0.08f, 6, Color{10, 16, 30, 235});
     DrawRectangleRoundedLines(Rectangle{static_cast<float>(mapX), static_cast<float>(mapY), static_cast<float>(mapSize), static_cast<float>(mapSize)}, 0.08f, 6, Color{56, 189, 248, 140});
@@ -1417,12 +1437,13 @@ void Renderer::drawMinimap(const WorldSnapshot& snapshot, const CityMap& map, co
 }
 
 void Renderer::drawToasts() {
+    const int screenW = GetScreenWidth();
     int toastY = 56;
     for (const auto& t : m_toasts) {
         float alpha = std::clamp(t.remainingDuration / 0.8f, 0.0f, 1.0f);
         int toastW = 340;
         int toastH = 28;
-        int toastX = (m_config.screenWidth - toastW) / 2;
+        int toastX = (screenW - toastW) / 2;
 
         DrawRectangleRounded(Rectangle{static_cast<float>(toastX), static_cast<float>(toastY), static_cast<float>(toastW), static_cast<float>(toastH)}, 0.4f, 4, fadeColor(Color{15, 23, 42, 235}, alpha));
         DrawRectangleRoundedLines(Rectangle{static_cast<float>(toastX), static_cast<float>(toastY), static_cast<float>(toastW), static_cast<float>(toastH)}, 0.4f, 4, fadeColor(t.color, alpha));
@@ -1433,10 +1454,12 @@ void Renderer::drawToasts() {
 }
 
 void Renderer::drawKeycapChips() {
+    const int screenW = GetScreenWidth();
+    const int screenH = GetScreenHeight();
     const int barH = 34;
-    const int barY = m_config.screenHeight - barH;
-    DrawRectangle(0, barY, m_config.screenWidth, barH, Color{10, 15, 26, 235});
-    DrawLine(0, barY, m_config.screenWidth, barY, Color{56, 189, 248, 60});
+    const int barY = screenH - barH;
+    DrawRectangle(0, barY, screenW, barH, Color{10, 15, 26, 235});
+    DrawLine(0, barY, screenW, barH, Color{56, 189, 248, 60});
 
     const char* chips[] = {
         "[1-9] Chase UAV",

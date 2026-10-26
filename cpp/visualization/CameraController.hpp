@@ -70,11 +70,21 @@ public:
     void handleInput(double dt);
 
     // Mode and target selection
-    void setMode(CameraMode mode) noexcept { m_mode = mode; }
+    void setMode(CameraMode mode) noexcept {
+        if (m_mode != mode) {
+            m_mode = mode;
+            m_targetChanged = true;
+        }
+    }
     [[nodiscard]] CameraMode getMode() const noexcept { return m_mode; }
     void cycleMode() noexcept;
 
-    void setChaseTarget(UAVId id) noexcept { m_chaseTargetId = id; }
+    void setChaseTarget(UAVId id) noexcept {
+        if (m_chaseTargetId != id) {
+            m_chaseTargetId = id;
+            m_targetChanged = true;
+        }
+    }
     [[nodiscard]] UAVId getChaseTarget() const noexcept { return m_chaseTargetId; }
     void cycleChaseTarget(size_t fleetSize) noexcept;
 
@@ -84,7 +94,10 @@ public:
     [[nodiscard]] const Vec3& getUp() const noexcept { return m_up; }
     [[nodiscard]] double getFov() const noexcept { return m_fov; }
 
-    void setTarget(const Vec3& target) noexcept { m_target = target; }
+    void setTarget(const Vec3& target) noexcept {
+        m_target = target;
+        m_targetChanged = true;
+    }
     void setDistance(double dist) noexcept { m_distance = MathUtils::clamp(dist, 10.0, 12000.0); }
     [[nodiscard]] double getDistance() const noexcept { return m_distance; }
 
@@ -105,6 +118,7 @@ private:
     Vec3 m_target{0.0, 0.0, 15.0};
     Vec3 m_up{0.0, 0.0, 1.0}; // Z-Up in AeroFleet coordinate space
     double m_fov{45.0};
+    bool m_targetChanged{false};
 
     // Orbit parameters
     double m_distance{350.0};
