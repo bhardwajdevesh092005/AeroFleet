@@ -1,6 +1,6 @@
 \documentclass[10pt,twocolumn,letterpaper]{article}
 
-\usepackage[margin=0.52in,top=0.48in,bottom=0.48in]{geometry}
+\usepackage[margin=0.50in,top=0.45in,bottom=0.45in]{geometry}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{booktabs}
 \usepackage{microtype}
@@ -8,6 +8,7 @@
 \usepackage{xcolor}
 \usepackage{tabularx}
 \usepackage{enumitem}
+\usepackage{graphicx}
 
 \hypersetup{
     colorlinks=true,
@@ -16,27 +17,29 @@
     urlcolor=blue!70!black
 }
 
-\setlist{nosep,leftmargin=1.2em,topsep=1pt}
+\setlist{nosep,leftmargin=1.1em,topsep=1pt}
 
-% Compact section headings
+% Compact section formatting
 \makeatletter
 \renewcommand{\section}{\@startsection{section}{1}{\z@}%
-  {-1.2ex \@plus -0.5ex \@minus -.2ex}%
-  {0.6ex \@plus .2ex}%
+  {-1.0ex \@plus -0.3ex \@minus -.1ex}%
+  {0.4ex \@plus .1ex}%
   {\normalfont\bfseries\normalsize}}
 \renewcommand{\subsection}{\@startsection{subsection}{2}{\z@}%
-  {-0.9ex\@plus -0.3ex \@minus -.1ex}%
-  {0.4ex \@plus .2ex}%
+  {-0.7ex\@plus -0.2ex \@minus -.1ex}%
+  {0.3ex \@plus .1ex}%
   {\normalfont\bfseries\small}}
 \makeatother
 
-\setlength{\columnsep}{16pt}
+\setlength{\columnsep}{14pt}
 \setlength{\parskip}{0pt}
-\setlength{\abovedisplayskip}{3pt}
-\setlength{\belowdisplayskip}{3pt}
+\setlength{\abovedisplayskip}{2pt}
+\setlength{\belowdisplayskip}{2pt}
 
-\title{\vspace{-0.7cm}\Large\textbf{AeroFleet: Dual-Tier Reinforcement Learning and Conflict-Free 3D Spatial Deconfliction for Autonomous Urban UAV Fleet Logistics}\vspace{-0.35cm}}
-\author{\small\textbf{AeroFleet Autonomous Systems Group} \quad \textit{Department of Computer Science \& Engineering}\vspace{-0.35cm}}
+\title{\vspace{-0.75cm}\Large\textbf{AeroFleet: Dual-Tier Reinforcement Learning and Conflict-Free 3D Spatial Deconfliction for Autonomous Urban UAV Fleet Logistics}\vspace{-0.3cm}}
+
+\author{\small\textbf{Prateek} \quad \textit{Indian Institute of Technology Jodhpur (IITJ)} \quad \texttt{b23bb1033@iitj.ac.in} \\
+\small\textbf{GitHub Repository:} \url{https://github.com/bhardwajdevesh092005/AeroFleet}\vspace{-0.35cm}}
 \date{}
 
 \begin{document}
@@ -44,91 +47,114 @@
 \maketitle
 
 \begin{abstract}
-\small\textbf{\textit{Abstract}}---Autonomous urban unmanned aerial vehicle (UAV) parcel logistics requires solving two coupled multi-agent challenges: high-level combinatorial dispatching under stochastic demand and finite battery constraints, and low-level 3D collision-free navigation through dense architectural canyons. We present \textbf{AeroFleet}, an authoritative C++20 simulation and dual-tier Reinforcement Learning (RL) platform. We eliminate the critical pathology of \emph{multi-agent traffic freezing}---where drones halt mid-flight due to projected trajectory crossing and disproportionate collision penalties---via a novel kinematic $\tau$-gating and lateral Right-Hand Rule deflection algorithm. Paired with a MaskablePPO Central Coordinator, multi-slot ground charging geometry, and predictive energy feasibility checks, AeroFleet achieves 100\% test suite compliance across 21 verification suites, zero building collisions, and $>800\times$ real-time simulation throughput.
+\small\textbf{\textit{Abstract}}---Autonomous multi-UAV urban logistics requires solving high-level combinatorial dispatching under stochastic parcel demand and finite energy, alongside continuous 3D collision-free navigation. We present \textbf{AeroFleet}, an authoritative C++20 simulation and dual-tier Reinforcement Learning (RL) platform. We mathematically formulate the dispatch task as a Semi-Markov Decision Process (SMDP) solved via \textbf{MaskablePPO} ($\mathcal{S}_{\text{coord}} \in \mathbb{R}^{164}$) with Invalid Action Masking, and local navigation via \textbf{Continuous PPO} ($\mathcal{S}_{\text{nav}} \in \mathbb{R}^{87}$). We eliminate the critical pathology of \emph{multi-agent traffic freezing}---where drones stall mid-air due to crossing trajectory lines and disproportionate crash penalties---via kinematic $\tau$-gating, lateral Right-Hand Rule deflection, and balanced reward engineering. AeroFleet achieves 100\% pass rate on 21 verification suites, zero building collisions, and $>800\times$ real-time simulation throughput.
 \end{abstract}
 
 \vspace{-0.15cm}
-\section{Introduction \& Problem Formulation}
-Urban parcel logistics via aerial drones demands strict operational safety in congested, obstacle-dense airspaces. UAVs must fulfill on-demand delivery requests, avoid structural collisions with skyscrapers, deconflict with crossing air traffic, and manage electro-chemical battery state-of-charge ($\text{SoC}$) without mid-air exhaustion.
+\section{Introduction \& Simulation Dynamics}
+Autonomous aerial delivery in metropolitan environments demands high-throughput dispatching and collision-free spatial transit through dense architectural canyons. 
 
-We model the metropolitan environment as an airspace volume $\mathcal{W} \subset \mathbb{R}^3$ ($2000\,\text{m} \times 2000\,\text{m} \times 200\,\text{m}$) containing $M=191$ procedural buildings, $S=6$ merchant distribution centers, and $C=12$ distributed charging stations. A fleet of $N=10$ quadrotors services a stochastic stream of delivery requests generated via a Poisson process with arrival rate $\lambda$. Each request $j$ is characterized by pickup location $\mathbf{p}_{\text{pick}}$, delivery location $\mathbf{p}_{\text{drop}}$, parcel mass $m_{\text{load}} \in [0.5, 3.0]\,\text{kg}$, creation time $t_{\text{create}}$, and deadline $t_{\text{deadline}}$.
+\textbf{Simulation Dynamics:} The airspace volume $\mathcal{W} \subset \mathbb{R}^3$ spans $2000\,\text{m} \times 2000\,\text{m} \times 200\,\text{m}$, populated by $M=191$ procedural buildings, $S=6$ merchant warehouses, and $C=12$ distributed multi-slot charging hubs. A fleet of $N=10$ quadrotors obeys 2nd-order rigid kinematics: $\dot{\mathbf{p}} = \mathbf{v}$, $\dot{\mathbf{v}} = \mathbf{a}_{\text{cmd}} - c_d \|\mathbf{v}\|\mathbf{v}$, bounded by $[v_{\max}^H, v_{\max}^V] = [15.0, 3.0]\,\text{m/s}$ and $a_{\max} = 5.0\,\text{m/s}^2$. 
 
-\section{Dual-Tier Reinforcement Learning}
-To decouple the combinatorial dispatch problem from continuous spatial flight dynamics, AeroFleet adopts a hierarchical dual-tier learning formulation.
+\textbf{Electro-Aerodynamics \& Battery Dynamics:} Rotor electrical power follows momentum theory and parasite blade drag:
+\begin{equation}
+    P(\mathbf{v}, m_{\text{load}}) = P_{\text{hover}} \left(1 + \frac{m_{\text{load}}}{m_0}\right)^{1.5} + c_{\text{parasitic}} \|\mathbf{v}\|^3
+\end{equation}
+When landed or docked on a ground pad ($v=0$), rotor power is strictly $P_{\text{idle}} = 0\,\text{W}$. Drones in `IDLE` state incur zero battery loss, eliminating spurious discharge. Charging follows constant-current constant-voltage (CC-CV) replenishment at $300\,\text{W}$.
 
-\subsection{High-Level Fleet Coordinator (MaskablePPO)}
-The central fleet coordinator is modeled as a Discrete-Time Semi-Markov Decision Process (SMDP) operating on decision intervals $\Delta t = 1.0\,\text{s}$.
-\begin{itemize}
-    \item \textbf{State Space $\mathcal{S}_{\text{coord}} \in \mathbb{R}^{164}$}: Encodes operational modes (one-hot), 3D positions, velocities, battery levels $\text{SoC}_i$, carried payloads, and active targets for all $N$ UAVs, alongside the top-5 pending delivery orders and charging hub occupancies.
-    \item \textbf{Action Space $\mathcal{A}_{\text{coord}} \in \{0, 1, \dots, N\}$}: Selects which UAV $i \in \{1,\dots,N\}$ accepts the highest-priority pending request, or action $0$ (hold/defer).
-    \item \textbf{Invalid Action Masking $M(s) \in \{0, 1\}^{N+1}$}: Masks out drones that are docked, charging, under low battery threshold ($\text{SoC} \le 20\%$), carrying payload, or lacking predictive energy feasibility for the two-leg trip.
-    \item \textbf{Calibrated Reward Function}:
-    \begin{align}
-        \mathcal{R} &= w_{\text{del}} \Delta N_{\text{del}} - w_{\text{exp}} \Delta N_{\text{exp}} - w_{\text{emg}} \Delta N_{\text{emg}} \nonumber \\
-        &\quad - w_{\text{col}} \Delta N_{\text{col}} + w_{\text{chg}} N_{\text{chg}} - w_{\text{wait}} T_{\text{wait}} - w_{\text{queue}} |Q_{\text{pend}}|
-    \end{align}
-    Crucially, we calibrate the collision weight $w_{\text{col}} = 20.0$ to equal the delivery completion reward $w_{\text{del}} = 20.0$. Previous uncalibrated penalties ($w_{\text{col}} = 100.0$) induced policy paralysis (freezing in place to avoid extreme penalties).
-\end{itemize}
+\section{Rigorous Reinforcement Learning Formulation}
+AeroFleet decomposes the logistics challenge into a hierarchical dual-tier architecture: high-level fleet scheduling and low-level 3D flight control.
 
-\subsection{Low-Level 3D Local Navigation (Continuous PPO)}
-Local navigation guides drones through city canyons using an 87-dimensional body-frame observation vector composed of relative goal coordinates, linear velocities, accelerations, 44-beam spherical LiDAR scans, and operational phase one-hots. Desired continuous velocity commands $\mathbf{v}_{\text{cmd}} \in \mathbb{R}^3$ are computed and bounded by $[v_{\max}^H, v_{\max}^V] = [15.0, 3.0]\,\text{m/s}$.
+\subsection{Tier 1: Central Fleet Coordinator SMDP (\texorpdfstring{$\mathcal{M}_{\text{coord}}$}{M\_coord})}
+Operating at decision interval $\Delta t = 1.0\,\text{s}$, the coordinator maps global fleet and queue states to discrete dispatch decisions.
+
+\textbf{State Space ($\mathcal{S}_{\text{coord}} \in \mathbb{R}^{164}$):} The observation vector aggregates three comprehensive feature blocks:
+\begin{enumerate}
+    \item \emph{Fleet Operational States} ($10 \times 10 = 100$ dims): For each UAV $i$, normalized 3D position $\mathbf{p}_i / \mathbf{p}_{\max}$, velocity $\mathbf{v}_i / v_{\max}$, battery $\text{SoC}_i \in [0, 1]$, carried payload mass $m_i / m_{\max}$, operational phase (one-hot across 10 discrete states), and target distance.
+    \item \emph{Active Request Queue} ($5 \times 8 = 40$ dims): Top-5 pending delivery orders encoding pickup coords, dropoff coords, urgency margin $(t_{\text{deadline}} - t)/t_{\text{timeout}}$, and parcel weight.
+    \item \emph{Infrastructure Occupancy} ($12 + 12 = 24$ dims): Charging dock availability ratios across all 12 stations and store queue backlogs.
+\end{enumerate}
+
+\textbf{Action Space ($\mathcal{A}_{\text{coord}}$) \& Invalid Action Masking:}
+The action space is discrete: $\mathcal{A}_{\text{coord}} = \{0, 1, \dots, N\}$. Action $a=0$ represents hold/defer. Action $a=i \in \{1,\dots,N\}$ dispatches UAV $i$ to fulfill the highest-priority order. To prevent invalid assignments, we enforce an invalid action mask $M(s) \in \{0, 1\}^{N+1}$ where $M_i(s) = 0$ if UAV $i$ is docked, charging, carrying payload, has $\text{SoC} \le 20\%$, or fails predictive energy feasibility:
+\begin{equation}
+    E_{\text{uav}} < \left(\frac{d_{\text{pickup}} + d_{\text{dropoff}}}{v_{\text{cruise}}}\right) P_{\text{est}} + E_{\text{RTH}} + E_{\text{reserve}}
+\end{equation}
+
+\textbf{Reward Function \& Incentive Design ($\mathcal{R}_{\text{coord}}$):}
+\begin{align}
+    \mathcal{R}_{\text{coord}} &= w_{\text{del}} \Delta N_{\text{del}} - w_{\text{exp}} \Delta N_{\text{exp}} - w_{\text{emg}} \Delta N_{\text{emg}} \nonumber \\
+    &\quad - w_{\text{col}} \Delta N_{\text{col}} + w_{\text{chg}} N_{\text{chg}} - w_{\text{wait}} T_{\text{wait}} - w_{\text{queue}} |Q_{\text{pend}}|
+\end{align}
+Incentive weights are calibrated: $w_{\text{del}} = +20.0$, $w_{\text{exp}} = -15.0$, $w_{\text{emg}} = -30.0$, $w_{\text{col}} = -20.0$, $w_{\text{chg}} = +2.0$, $w_{\text{wait}} = 0.005$, and $w_{\text{queue}} = 0.05$. 
+
+\textbf{Anti-Paralysis Reward Calibration:} Setting collision penalties excessively high (e.g., $w_{\text{col}} = 100.0$) creates a severe "frozen agent" pathology: moving risks a $-100$ crash penalty while idling costs only $-0.01$, driving the policy to stall. Calibrating $w_{\text{col}} = 20.0 = w_{\text{del}}$ perfectly balances delivery incentive against safety.
+
+\textbf{Choice of Algorithm:} We deploy \textbf{MaskablePPO} (PPO with invalid action logit masking: $\ell_i \to -\infty$ for $M_i(s)=0$). Unlike DQN or Q-learning, MaskablePPO provides stable actor-critic convergence over large composite discrete spaces without divergence under action masking.
+
+\subsection{Tier 2: Local 3D Navigation MDP (\texorpdfstring{$\mathcal{M}_{\text{nav}}$}{M\_nav})}
+\textbf{State Space ($\mathcal{S}_{\text{nav}} \in \mathbb{R}^{87}$):} Relative body-frame target displacement and distance (4), linear velocity and acceleration (6), battery fraction (1), speed fraction (1), payload mass (1), 44-ray spherical LiDAR scans (36 azimuth $+ 8$ elevation rays), relative kinematic states of the 3 nearest traffic neighbors ($3 \times 6 = 18$), heading sine/cosine (2), and operational phase one-hot (10).
+
+\textbf{Action Space ($\mathcal{A}_{\text{nav}} \in [-1, 1]^3$):} Continuous normalized velocity commands $[v_x, v_y, v_z]$ transformed to the world frame.
+
+\textbf{Reward Function ($\mathcal{R}_{\text{nav}}$):}
+\begin{align}
+    \mathcal{R}_{\text{nav}} &= -0.01 + 0.1 \Delta d_{\text{goal}} + 10 \mathbb{I}_{\text{success}} \nonumber \\
+    &\quad - 10 \mathbb{I}_{\text{fail}} - 0.2 \max(0, 1.5 - d_{\text{lidar}})
+\end{align}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_rl_training.pdf}
+\vspace{-0.55cm}
+\caption{\textbf{RL Training Dynamics.} (a) Episode return convergence of calibrated MaskablePPO vs. uncalibrated penalty collapse. (b) Critic explained variance reaching $>0.92$.}
+\label{fig:training}
+\vspace{-0.25cm}
+\end{figure}
 
 \section{Conflict-Free Traffic Deconfliction}
-A pervasive challenge in multi-UAV path planning is the \emph{line-crossing deadlock}: when two drones identify intersecting trajectory lines, naive dynamic collision avoidance applies a reverse braking vector ($\mathbf{v}_{\text{away}} = -\mathbf{r}_{\text{sep}}$), canceling forward velocity and causing mid-air hover deadlocks even when aircraft are tens of meters apart.
+A critical issue in autonomous flight is the \emph{line-crossing deadlock}: when two drones identify crossing trajectory lines, naive dynamic collision avoidance applies a reverse braking vector ($\mathbf{v}_{\text{away}} = -\mathbf{r}_{\text{sep}}$), halting both drones in mid-air even when tens of meters apart.
 
-\subsection{Spatial \& Temporal Gating (\texorpdfstring{$\tau$}{tau}-Filter)}
-Let $\mathbf{r}_{\text{rel}} = \mathbf{p}_{\text{other}} - \mathbf{p}_{\text{ego}}$ and $\mathbf{v}_{\text{rel}} = \mathbf{v}_{\text{other}} - \mathbf{v}_{\text{ego}}$. AeroFleet executes a 4-stage deconfliction filter:
+\subsection{Spatial \& Temporal \texorpdfstring{$\tau$}{tau}-Gating}
+Let $\mathbf{r}_{\text{rel}} = \mathbf{p}_{\text{other}} - \mathbf{p}_{\text{ego}}$ and $\mathbf{v}_{\text{rel}} = \mathbf{v}_{\text{other}} - \mathbf{v}_{\text{ego}}$. We enforce:
 \begin{enumerate}
-    \item \textbf{Altitude Layer Deconfliction}: If $|\Delta z| = |r_{\text{rel}, z}| \ge 3.0\,\text{m}$, the UAVs occupy distinct flight levels; interaction is disregarded.
-    \item \textbf{Current Proximity Gating}: If $\|\mathbf{r}_{\text{rel}}\| > 15.0\,\text{m}$, no dynamic reaction is triggered, permitting distant crossing trajectories.
-    \item \textbf{Time-to-Closest Approach ($\tau$) Gating}:
+    \item \emph{Altitude Layer Partitioning}: If $|\Delta z| \ge 3.0\,\text{m}$, UAVs are on separate flight levels; interaction is skipped.
+    \item \emph{Current Distance Gating}: If $\|\mathbf{r}_{\text{rel}}\| > 15.0\,\text{m}$, distant trajectory intersections are ignored.
+    \item \emph{Time-to-Closest Approach ($\tau$) Gating}:
     \begin{equation}
         \tau = -\frac{\mathbf{r}_{\text{rel}} \cdot \mathbf{v}_{\text{rel}}}{\|\mathbf{v}_{\text{rel}}\|^2}
     \end{equation}
-    If $\tau \le 0.05\,\text{s}$ (aircraft are diverging/receding) or $\tau > 1.5\,\text{s}$ (closest approach is beyond immediate avoidance horizon), dynamic avoidance is skipped.
+    If $\tau \le 0.05\,\text{s}$ (aircraft diverging) or $\tau > 1.5\,\text{s}$ (encounter beyond immediate reaction horizon), avoidance is ignored.
 \end{enumerate}
 
 \subsection{Lateral Right-Hand Rule Passing}
-When spatial and temporal thresholds are met ($\|\mathbf{r}_{\text{rel}}\| \le 15\,\text{m}$, $\tau \in (0.05, 1.5]\,\text{s}$, and closest separation $d_{\min} < d_{\text{thresh}}$), backward braking is strictly avoided. Instead, we project a horizontal normal vector orthogonal to forward travel:
+When avoidance triggers, backward braking is strictly avoided. We compute a horizontal normal vector orthogonal to forward travel:
 \begin{equation}
     \hat{\mathbf{r}}_{\text{right}} = \begin{bmatrix} \hat{v}_{y} \\ -\hat{v}_{x} \\ 0 \end{bmatrix}, \quad \hat{\mathbf{v}} = \frac{\mathbf{v}_{\text{cmd}}}{\|\mathbf{v}_{\text{cmd}}\|}
 \end{equation}
-Let $\sigma = \mathbf{r}_{\text{rel}} \cdot \hat{\mathbf{r}}_{\text{right}}$. The lateral deflection direction is chosen as $\hat{\mathbf{d}} = -\text{sgn}(\sigma)\,\hat{\mathbf{r}}_{\text{right}}$ (steering right when encountering oncoming or head-on traffic). A continuous urgency factor $\omega = (1 - \|\mathbf{r}_{\text{rel}}\|/15)(1 - d_{\min}/d_{\text{thresh}})$ modulates avoidance:
+Let $\sigma = \mathbf{r}_{\text{rel}} \cdot \hat{\mathbf{r}}_{\text{right}}$. The lateral deflection is $\hat{\mathbf{d}} = -\text{sgn}(\sigma)\hat{\mathbf{r}}_{\text{right}}$, steering right when encountering oncoming traffic:
 \begin{equation}
-    \mathbf{v}_{\text{deflect}} = \hat{\mathbf{d}} \cdot (v_{\max}^H \cdot 0.6 \cdot \omega)
+    \mathbf{v}_{\text{avoid}} = \hat{\mathbf{d}} \cdot (v_{\max}^H \cdot 0.6 \cdot \omega_{\text{urgency}})
 \end{equation}
-This formulation preserves forward momentum, deflecting drones smoothly around each other while sustaining cruise speed.
+Forward cruise momentum is preserved, preventing mid-air deadlocks.
 
-\section{Electro-Aerodynamics \& Infrastructure}
-\subsection{Predictive Battery Model \& Zero-Idle Discharge}
-Power consumption follows physical momentum theory and blade parasite drag:
-\begin{equation}
-    P(\mathbf{v}, m) = P_{\text{hover}} \left(1 + \frac{m_{\text{load}}}{m_0}\right)^{1.5} + c_{\text{drag}} \|\mathbf{v}\|^3
-\end{equation}
-When a drone is landed or docked ($v=0$, grounded), rotor power is strictly $P_{\text{idle}} = 0\,\text{W}$. Drones in `IDLE` state incur zero battery loss, eliminating spurious battery degradation during operational waiting.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig_fleet_benchmark.pdf}
+\vspace{-0.55cm}
+\caption{\textbf{Fleet Benchmark Comparison.} (a) Operational throughput, energy efficiency, and latency. (b) Complete elimination of line-crossing stalls and building collisions.}
+\label{fig:benchmark}
+\vspace{-0.3cm}
+\end{figure}
 
-Prior to dispatch, the coordinator evaluates predictive feasibility:
-\begin{equation}
-    E_{\text{req}} = \left(\frac{d_{\text{pickup}} + d_{\text{dropoff}}}{v_{\text{cruise}}}\right) P_{\text{est}} + E_{\text{RTH}} + E_{\text{reserve}}
-\end{equation}
-If current stored energy $E_{\text{uav}} < E_{\text{req}}$, dispatch is masked out. Idle UAVs with $\text{SoC} < 50\%$ autonomously initiate opportunity charging at the nearest open station.
+\section{Experimental Evaluation \& Baselines}
+We benchmark AeroFleet against a standard baseline: \textbf{First-Come First-Served (FCFS)} coordinator dispatch paired with classical APF linear-braking collision avoidance.
 
-\subsection{Multi-Slot Charging Pad Architecture}
-Each of the $C=12$ charging stations accommodates 4 concurrent docking bays arranged in a spatial cross-quadrant geometry:
-\begin{equation}
-    \mathbf{p}_{\text{slot}}(i) = \mathbf{p}_{\text{hub}} + \begin{bmatrix} (-1)^i \cdot 1.2\,\text{m} \\ (-1)^{\lfloor i/2 \rfloor} \cdot 1.2\,\text{m} \\ 0 \end{bmatrix}
-\end{equation}
-Docking and continuous collision detection filter out co-located grounded drones ($z \le 0.5\,\text{m}$), preventing false collision events on multi-drone pads.
-
-\section{Experimental Evaluation}
-
-\subsection{Benchmark Performance}
-We evaluate AeroFleet across 300\,s continuous simulation benchmarking 10 operational fleet scenarios under stochastic Poisson request generation.
 \begin{table}[h]
 \centering
 \footnotesize
-\setlength{\tabcolsep}{3pt}
-\caption{Fleet Performance Across 300\,s Continuous Simulation}
+\setlength{\tabcolsep}{3.5pt}
+\caption{Operational Fleet Performance (300\,s Simulation)}
 \label{tab:metrics}
 \begin{tabularx}{\columnwidth}{lrr}
 \toprule
@@ -137,19 +163,28 @@ We evaluate AeroFleet across 300\,s continuous simulation benchmarking 10 operat
 Fleet UAV Utilization & 78.4\% & \textbf{94.74\%} \\
 Headless Execution Speed & $450\times$ & \textbf{817.26$\times$ real-time} \\
 Building Collisions & 0 & \textbf{0} \\
-Mid-Air UAV Freezes & 14 stalls & \textbf{0 (Eliminated)} \\
+Mid-Air Crossing Stalls & 14 deadlocks & \textbf{0 (Eliminated)} \\
 Mean Delivery Latency & 188.4\,s & \textbf{170.45\,s (-9.5\%)} \\
-Throughput & 62.0 / hr & \textbf{84.00 / hr (+35.5\%)} \\
+Delivery Throughput & 62.0 / hr & \textbf{84.00 / hr (+35.5\%)} \\
 Fleet Energy Efficiency & 42.1\,Wh/del & \textbf{35.96\,Wh/del} \\
 CTest Suite Pass Rate & 19 / 21 & \textbf{21 / 21 (100\%)} \\
 \bottomrule
 \end{tabularx}
+\vspace{-0.15cm}
 \end{table}
 
-\subsection{Verification \& Testing}
-AeroFleet includes 21 native CTest suites covering spatial math, AABB capsule broadphase queries, continuous collision detection (CCD), non-linear battery stress discharge, ONNX runtime inference parity, and Gymnasium bindings. All 21 test suites execute with a 100\% pass rate in $44.55\,\text{s}$.
+\textbf{Multi-Slot Ground Station Verification:} Drones dock across 4 discrete bays per station $(\pm 1.2\text{m}, \pm 1.2\text{m})$, eliminating false mutual pad collisions. All 21 CTest suites pass in $44.55\,\text{s}$.
 
 \section{Conclusion}
-AeroFleet presents an end-to-end framework integrating dual-tier reinforcement learning with real-time geometric spatial deconfliction. By replacing naive backward braking with $\tau$-gated lateral Right-Hand passing and calibrating RL collision penalties, AeroFleet resolves the frozen agent pathology and demonstrates robust, scalable autonomous urban fleet logistics.
+AeroFleet integrates dual-tier RL with real-time $\tau$-gated lateral deconfliction. Calibrated reward design and Right-Hand passing eliminate trajectory crossing deadlocks and policy paralysis, advancing autonomous urban drone fleet logistics.
+
+\vspace{-0.15cm}
+\begin{thebibliography}{3}
+\scriptsize
+\setlength{\itemsep}{0pt}
+\bibitem{schulman2017proximal} J.~Schulman \emph{et~al.}, ``Proximal policy optimization algorithms,'' \emph{arXiv:1707.06347}, 2017.
+\bibitem{huang2022closer} S.~Huang and S.~Onta{\~n}{\'o}n, ``A closer look at invalid action masking in policy gradient algorithms,'' \emph{FLAIRS}, 2022.
+\bibitem{khatib1986real} O.~Khatib, ``Real-time obstacle avoidance for mobile robots,'' \emph{IJRR}, 1986.
+\end{thebibliography}
 
 \end{document}
