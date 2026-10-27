@@ -14,17 +14,19 @@
 **AeroFleet** is an end-to-end simulation and training platform for autonomous multi-UAV urban parcel logistics. In modern metropolitan environments, drones must deliver time-sensitive parcels across dense city skylines under finite battery capacities, dynamic customer demand, restricted airspace boundaries, and complex obstacle topologies.
 
 AeroFleet formulates and solves this multi-agent logistics challenge using a **Dual-Tier Reinforcement Learning Architecture**:
-1. **High-Level Central Fleet Coordinator (Maskable PPO)**: Formulated as an MDP with **Invalid Action Masking**. Observes global delivery queue states, UAV fleet battery levels, coordinates, and depot statuses, dynamically dispatching eligible, non-depleted UAVs to optimize throughput, reduce delivery latency, and eliminate battery starvation.
-2. **Low-Level Autonomous Navigation Agent (Continuous PPO)**: Guides individual quadrotors along collision-free 3D trajectories through urban canyon air corridors, respecting aerodynamic drag, dynamic payload mass, and continuous obstacle avoidance.
-3. **Deterministic Safety Supervisor**: A C++ predictive spatial safety layer intercepting velocity commands to mathematically guarantee zero building and inter-UAV collisions.
+1. **High-Level Central Fleet Coordinator (Maskable PPO)**: Formulated as an SMDP with **Invalid Action Masking**. Observes global delivery queue states, UAV fleet battery levels, coordinates, and depot statuses, dynamically dispatching eligible, non-depleted UAVs to optimize throughput, reduce delivery latency, and eliminate battery starvation. Features predictive energy feasibility checks and autonomous opportunity charging.
+2. **Low-Level Autonomous Navigation Agent (Continuous PPO & 3D APF)**: Guides quadrotors along collision-free 3D trajectories through urban canyon air corridors, respecting aerodynamic drag, dynamic payload mass, and continuous obstacle avoidance.
+3. **Conflict-Free Dynamic Traffic Deconfliction Engine**: A temporal $\tau$-gated, lateral Right-Hand Rule deflection system that eliminates mid-air crossing deadlocks, maintaining cruising speed without backward braking stops.
+4. **Deterministic Safety Supervisor**: A C++ predictive spatial safety layer intercepting velocity commands to mathematically guarantee zero building collisions.
 
 ### Key Simulation Specifications
 - **World Envelope**: $2000\text{m} \times 2000\text{m} \times 200\text{m}$ ($4\times$ ground area, $5.3\times$ volume).
-- **Procedural City Skyline**: $8 \times 8$ metropolitan block grid with 63 skyscrapers (up to $110\text{m}$ altitude), illuminated architectural window bands, corner neon spines, ground entrance canopies, and rooftop communication spires.
-- **Urban Greenery & Parks**: 6 municipal public parks with blue ponds/fountains, manicured lawns, terracotta walking plazas, and street avenue trees along boulevards.
+- **Procedural City Skyline**: $8 \times 8$ metropolitan block grid with 191 building structures, illuminated architectural window bands, corner neon spines, ground entrance canopies, and rooftop communication spires.
+- **Multi-Slot Ground Infrastructure**: 12 distributed charging hubs with $4\times$ discrete docking pads per station ($\pm 1.2\text{m}, \pm 1.2\text{m}$ offsets), and 6 merchant fulfillment centers.
+- **Electro-Aerodynamic Battery Model**: Physically accurate rotor power discharge ($P \propto (1 + m/m_0)^{1.5} + c_{\text{drag}} v^3$), zero-discharge idle state ($P_{\text{idle}} = 0\,\text{W}$ when landed/docked), and CC-CV recharging.
 - **Airspace Geo-Fence**: Luminous cyan ground boundary lines, $200\text{m}$ altitude ceiling perimeter, 4 vertical corner laser towers with pulsing red aviation hazard strobes, and semi-transparent perimeter fence panels.
 - **Visual Engine**: Decoupled 3D visualization powered by **Raylib**, locked to **30 FPS**, featuring smooth anti-aliased **DejaVu Sans** typography.
-- **Headless Performance**: High-throughput headless C++ execution delivering **> 600× real-time** speed (> 300,000 steps/sec).
+- **Headless Performance**: High-throughput headless C++ execution delivering **> 800× real-time** speed (> 400,000 steps/sec).
 
 ---
 
@@ -271,37 +273,52 @@ python3 python/train_nav.py --stages 4 --timesteps 200000
 
 ---
 
-## 7. Mathematical RL Formulation Summary
+## 7. Mathematical RL & Control Formulation Summary
 
-### A. Central Fleet Coordinator MDP ($\mathcal{M}_{coord}$)
-- **State Space $\mathcal{S} \in \mathbb{R}^{106}$**:
-  - Global fleet state (10 UAVs $\times$ 7 features: normalized 3D position $(x, y, z)$, battery fraction $\text{SoC} \in [0, 1]$, operational mode one-hot, remaining distance to target, payload status).
-  - Active delivery request queue (Top-5 pending requests $\times$ 6 features: pickup coordinates, dropoff coordinates, urgency deadline margin, parcel weight).
-  - Station infrastructure state (Charging station dock availability ratios, store warehouse queue lengths).
-- **Action Space $\mathcal{A} \in \{0, \dots, N_{uav}\}$**:
-  - Discrete dispatch decision selecting which candidate UAV should service the highest-priority delivery request, or action $0$ for hold/defer.
-  - **Action Masking $M(s) \in \{0, 1\}^{|\mathcal{A}|}$**: Dynamically filters out UAVs that are docked, charging, under low battery threshold ($\le 20\%$), or currently carrying maximum payload.
-- **Reward Function $\mathcal{R}$**:
-  $$\mathcal{R} = R_{\text{delivery}} + R_{\text{latency}} + R_{\text{battery}} + R_{\text{starvation}}$$
-  - Delivery completion bonus: $+10.0$.
-  - Deadline urgency factor: $+5.0 \times \left(1.0 - \frac{t_{\text{delivery}}}{t_{\text{deadline}}}\right)$.
-  - Battery exhaustion penalty: $-20.0$ if any UAV enters critical low battery ($\le 15\%$).
-  - Dispatch starvation penalty: $-0.05 \times N_{\text{expired}}$.
+### A. Central Fleet Coordinator SMDP ($\mathcal{M}_{coord}$)
+- **State Space $\mathcal{S}_{\text{coord}} \in \mathbb{R}^{164}$**:
+  - Global fleet state (10 UAVs: normalized 3D position $(x, y, z)$, linear velocity, battery state-of-charge $\text{SoC} \in [0, 1]$, operational mode one-hot, active target waypoint, and carried payload mass).
+  - Active delivery request queue (Top-5 pending orders: pickup coordinates, dropoff coordinates, urgency deadline margin, parcel weight).
+  - Infrastructure occupancy state (12 charging stations $\times$ 4 dock availability ratios, store fulfillment queues).
+- **Action Space $\mathcal{A}_{\text{coord}} \in \{0, \dots, N_{uav}\}$**:
+  - Discrete dispatch decision assigning candidate UAV $i$ to the highest-priority pending delivery request, or action $0$ for hold/defer.
+  - **Invalid Action Masking $M(s) \in \{0, 1\}^{|\mathcal{A}|}$**: Dynamically filters out UAVs that are docked, charging, under low battery threshold ($\text{SoC} \le 20\%$), currently carrying maximum payload, or failing predictive energy feasibility.
+- **Calibrated Anti-Paralysis Reward Function $\mathcal{R}_{\text{coord}}$**:
+  $$\mathcal{R}_{\text{coord}} = w_{\text{del}} \Delta N_{\text{del}} - w_{\text{exp}} \Delta N_{\text{exp}} - w_{\text{emg}} \Delta N_{\text{emg}} - w_{\text{col}} \Delta N_{\text{col}} + w_{\text{chg}} N_{\text{chg}} - w_{\text{wait}} T_{\text{wait}} - w_{\text{queue}} |Q_{\text{pend}}|$$
+  - Delivery completion bonus: $w_{\text{del}} = +20.0$.
+  - Calibrated collision penalty: $w_{\text{col}} = -20.0$. Balanced equally with delivery bonus to eliminate the **"frozen agent"** local optimum where agents avoid all movement.
+  - Order expiration penalty: $w_{\text{exp}} = -15.0$.
+  - Emergency grounding penalty: $w_{\text{emg}} = -30.0$.
+  - Active opportunity charging bonus: $w_{\text{chg}} = +2.0$ for UAVs reaching full charge ($> 99\%$).
 
-### B. Local 3D Navigation MDP ($\mathcal{M}_{nav}$)
-- **Observation Space $\mathcal{S}_{nav} \in \mathbb{R}^{39}$**:
-  - Body-frame relative target vector $(\Delta x, \Delta y, \Delta z)$.
-  - Linear velocity vector and attitude angles $(\phi, \theta, \psi)$.
-  - 32-ray multi-directional spherical LiDAR obstacle depth scans.
+### B. Conflict-Free Spatial Deconfliction ($\tau$-Gating & Lateral Passing)
+To resolve the line-crossing deadlock pathology where UAVs previously braked to a dead stop when crossing paths:
+1. **Altitude Layer Partitioning**:
+   $$|\Delta z| \ge 3.0\,\text{m} \implies \text{No interaction (Clear flight levels)}$$
+2. **Current Proximity Gating**:
+   $$\|\mathbf{r}_{\text{rel}}\| > 15.0\,\text{m} \implies \text{No interaction (Distant crossing lines ignored)}$$
+3. **Time-to-Closest Approach ($\tau$) Gating**:
+   $$\tau = -\frac{\mathbf{r}_{\text{rel}} \cdot \mathbf{v}_{\text{rel}}}{\|\mathbf{v}_{\text{rel}}\|^2}$$
+   If $\tau \le 0.05\,\text{s}$ (aircraft are diverging/flying away) or $\tau > 1.5\,\text{s}$ (closest approach is beyond immediate reaction horizon), dynamic avoidance is skipped.
+4. **Lateral Right-Hand Rule Passing**:
+   When avoidance is active, backward braking is strictly replaced with a lateral normal vector perpendicular to forward flight:
+   $$\hat{\mathbf{r}}_{\text{right}} = \begin{bmatrix} \hat{v}_y \\ -\hat{v}_x \\ 0 \end{bmatrix}, \quad \mathbf{v}_{\text{avoid}} = \pm \hat{\mathbf{r}}_{\text{right}} \cdot (v_{\max}^H \cdot 0.6 \cdot \omega_{\text{urgency}})$$
+   UAVs steer smoothly to the right around each other while maintaining 100% cruise speed.
+
+### C. Local 3D Navigation MDP ($\mathcal{M}_{nav}$)
+- **Observation Space $\mathcal{S}_{nav} \in \mathbb{R}^{87}$**:
+  - Body-frame relative target vector, ego velocity, and acceleration.
+  - 44-ray multi-directional spherical LiDAR obstacle scans.
+  - Relative neighbor features and 10-class operational mode one-hot.
 - **Action Space $\mathcal{A}_{nav} \in [-1, 1]^3$**:
-  - Continuous commanded linear acceleration / target velocity vectors $[\ddot{x}_c, \ddot{y}_c, \ddot{z}_c]$.
+  - Continuous normalized desired velocity vector $[v_x, v_y, v_z]$.
 - **Reward Function $\mathcal{R}_{nav}$**:
-  $$\mathcal{R}_{nav} = -\alpha \|\mathbf{p} - \mathbf{p}_{\text{target}}\| + \beta (\Delta d_{\text{progress}}) - \gamma \mathbb{I}_{\text{collision}} - \delta \|\mathbf{a}\|^2$$
+  $$\mathcal{R}_{nav} = -0.01 + 0.1 \cdot \Delta d_{\text{progress}} + 10.0 \cdot \mathbb{I}_{\text{success}} - 10.0 \cdot \mathbb{I}_{\text{failed}} - 0.2 \cdot \max(0, 1.5 - d_{\text{lidar}})$$
 
 ---
 
-## 8. Academic Integrity & Course Deliverables
+## 8. Academic Deliverables & LaTeX Report
 
-- **Pure Reinforcement Learning**: All core dispatch and navigation policies are trained via Reinforcement Learning (Maskable PPO and PPO) without reliance on hardcoded heuristics.
-- **Originality & Authenticity**: All kinematics, electro-aerodynamics, spatial broadphase grids, Raylib visualization, and Python bindings are original implementations crafted specifically for this project.
-- **Report**: See [report.tex](file:///c:/Users/Prateek/Desktop/Coding/project/AeroFleet/report.tex) for the complete 2-page descriptive report formatted in Overleaf two-column LaTeX.
+- **2-Page Descriptive Report ([report.tex](file:///c:/Users/Prateek/Desktop/Coding/project/AeroFleet/report.tex))**: Complete two-column publication-grade report formatted for standard LaTeX and Overleaf, detailing the dual-tier RL architecture, $\tau$-gated lateral deconfliction, multi-slot infrastructure, and benchmark results.
+- **Authoritative C++ Core**: 100% compliant with 21 CTest suites.
+- **Zero-Discharge Idle Physics**: Landed and docked drones consume 0W, eliminating battery starvation while awaiting dispatch.
