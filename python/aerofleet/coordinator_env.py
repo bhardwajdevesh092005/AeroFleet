@@ -52,7 +52,7 @@ class AeroFleetCoordinatorEnv(gym.Env):
         w_assign_bonus: float = 0.5,
         w_emergency: float = 30.0,
         w_charging_bonus: float = 2.0,
-        w_collision: float = 100.0,
+        w_collision: float = 20.0,
         min_battery_dispatch_percent: float = 25.0,
     ) -> None:
         super().__init__()

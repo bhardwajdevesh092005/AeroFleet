@@ -330,7 +330,7 @@ int main(int argc, char* argv[]) {
     bool logEvents = false;
     bool exportMetrics = true;
 
-    bool useOnnxNav = true;
+    bool useOnnxNav = false;
     std::string navPolicyPath = "models/navigation/nav_policy.onnx";
     std::string normPath = "models/navigation/normalization.json";
     bool useSafety = true;

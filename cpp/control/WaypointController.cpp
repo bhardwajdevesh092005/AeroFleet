@@ -157,34 +157,84 @@ VelocityCommand WaypointController::applyTrafficAvoidance(
 
     Vec3 avoidance{};
     for (const auto& other : traffic) {
-        if (other.id == uav.id || other.mode == UAVMode::EMERGENCY || other.mode == UAVMode::OFFLINE ||
-            other.isGrounded || other.position.z <= 0.1) continue;
+        if (other.id == uav.id || other.mode == UAVMode::OFFLINE ||
+            (other.isGrounded && other.position.z <= 0.5)) continue;
 
         const Vec3 relativePosition = other.position - uav.position;
+        const double currentDist = relativePosition.length();
+
+        // 1. Altitude deconfliction: If vertical separation exceeds 3.0m, paths are clear
+        if (std::abs(relativePosition.z) >= 3.0) continue;
+
+        // 2. Distance gating: Do not react to drones that are not close (> 15.0m)
+        if (currentDist > 15.0) continue;
+
+        // 3. Trajectory projection for close drones
         const Vec3 relativeVelocity = other.velocity - command.desiredVelocity;
         const double relativeSpeedSq = relativeVelocity.lengthSquared();
+        if (relativeSpeedSq > 1e-6) {
+            const double tau = -relativePosition.dot(relativeVelocity) / relativeSpeedSq;
+            // If drones are diverging (tau <= 0.05) or closest approach is beyond avoidance horizon (> 1.5s),
+            // and they are not in immediate physical proximity (>= 4.0m), ignore completely
+            if ((tau <= 0.05 || tau > 1.5) && currentDist >= 4.0) {
+                continue;
+            }
+        }
+
         double timeToClosest = 0.0;
-        if (relativeSpeedSq > 1e-9) {
+        if (relativeSpeedSq > 1e-6) {
             timeToClosest = MathUtils::clamp(
                 -relativePosition.dot(relativeVelocity) / relativeSpeedSq,
                 0.0,
-                m_config.dynamicAvoidanceHorizon
+                1.5
             );
         }
 
         const Vec3 closestSeparation = relativePosition + relativeVelocity * timeToClosest;
         const double separation = closestSeparation.length();
-        if (separation >= m_config.dynamicAvoidanceDistance) continue;
+        if (separation >= m_config.dynamicAvoidanceDistance && currentDist >= 4.0) continue;
 
-        Vec3 away = -closestSeparation.normalized();
-        if (away.lengthSquared() <= 1e-12) {
-            away = Vec3(-relativeVelocity.y, relativeVelocity.x, 0.0).normalized();
-            if (away.lengthSquared() <= 1e-12) {
-                away = uav.id < other.id ? Vec3(0.0, 1.0, 0.0) : Vec3(0.0, -1.0, 0.0);
-            }
+        // 4. Lateral avoidance (Right-Hand Rule): Deflect sideways rather than braking backwards
+        Vec3 forwardDir = command.desiredVelocity.normalized();
+        if (forwardDir.lengthSquared() < 1e-6) {
+            forwardDir = Vec3(std::cos(uav.yaw), std::sin(uav.yaw), 0.0);
         }
-        const double urgency = 1.0 - separation / m_config.dynamicAvoidanceDistance;
-        avoidance += away * (m_config.maxHorizontalSpeed * urgency);
+
+        // Rightward horizontal normal: (forwardDir.y, -forwardDir.x, 0)
+        Vec3 lateralRight(forwardDir.y, -forwardDir.x, 0.0);
+        if (lateralRight.lengthSquared() > 1e-6) {
+            lateralRight = lateralRight.normalized();
+        } else {
+            lateralRight = Vec3(0.0, 1.0, 0.0);
+        }
+
+        // If the other UAV is already to our right, steer left; if to our left or directly ahead, steer right
+        double sideDot = relativePosition.x * lateralRight.x + relativePosition.y * lateralRight.y;
+        Vec3 deflectDir = (sideDot > 0.0) ? -lateralRight : lateralRight;
+
+        // If physically close (< 4.0m), guarantee horizontal and radial separation
+        if (currentDist < 4.0) {
+            Vec3 horizAway(-relativePosition.x, -relativePosition.y, 0.0);
+            if (horizAway.lengthSquared() < 0.25) {
+                horizAway = (uav.id < other.id) ? Vec3(1.0, 0.0, 0.0) : Vec3(-1.0, 0.0, 0.0);
+            } else {
+                horizAway = horizAway.normalized();
+            }
+            Vec3 radialAway = (currentDist > 1e-3) ? (-relativePosition / currentDist) : -forwardDir;
+            deflectDir = (deflectDir * 0.4 + horizAway * 0.4 + radialAway * 0.2).normalized();
+        }
+
+        // Add small vertical flight-level nudge if airborne
+        if (uav.position.z > 5.0 && other.position.z > 5.0) {
+            deflectDir.z += (uav.id < other.id) ? 0.3 : -0.3;
+            deflectDir = deflectDir.normalized();
+        }
+
+        const double distFactor = 1.0 - (currentDist / 15.0);
+        const double sepFactor = 1.0 - std::clamp(separation / m_config.dynamicAvoidanceDistance, 0.0, 1.0);
+        const double urgency = std::clamp(distFactor * sepFactor, 0.0, 1.0);
+
+        avoidance += deflectDir * (m_config.maxHorizontalSpeed * 0.6 * urgency);
     }
 
     command.desiredVelocity = clampHorizontal(
@@ -196,11 +246,6 @@ VelocityCommand WaypointController::applyTrafficAvoidance(
         -m_config.maxVerticalSpeed,
         m_config.maxVerticalSpeed
     );
-
-    if (uav.position.z < 10.0 && command.desiredVelocity.z > 0.0) {
-        command.desiredVelocity.x = 0.0;
-        command.desiredVelocity.y = 0.0;
-    }
     return command;
 }
 

@@ -90,7 +90,8 @@ bool CollisionSystem::checkDynamicCollision(
     const UAVState& uavB, const Vec3& prevPosB,
     CollisionEvent& outEvent
 ) const {
-    if (uavA.isGrounded && uavB.isGrounded && uavA.position.z <= 0.1 && uavB.position.z <= 0.1) {
+    if ((uavA.isGrounded || uavA.mode == UAVMode::CHARGING || uavA.position.z <= 0.5) &&
+        (uavB.isGrounded || uavB.mode == UAVMode::CHARGING || uavB.position.z <= 0.5)) {
         return false;
     }
 

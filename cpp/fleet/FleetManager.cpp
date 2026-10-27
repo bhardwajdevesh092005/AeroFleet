@@ -36,7 +36,10 @@ void FleetManager::initialize(
         if (!map.chargingStations.empty()) {
             size_t stationIdx = i % map.chargingStations.size();
             spawnPos = map.chargingStations[stationIdx].position;
-            // Ground level docking pad
+            const double offsetX = (i % 2 == 0) ? 1.2 : -1.2;
+            const double offsetY = ((i / 2) % 2 == 0) ? 1.2 : -1.2;
+            spawnPos.x += offsetX;
+            spawnPos.y += offsetY;
             spawnPos.z = map.chargingStations[stationIdx].position.z;
         }
 
@@ -432,12 +435,16 @@ void FleetManager::handleReturningToCharge(UAVState& uav, UAVContext& ctx, CityM
         }
         const double rthAltitude = std::min(map.worldMax.z - 5.0, localMaxHeight);
 
+        const double offsetX = (uav.id % 2 == 0) ? 1.2 : -1.2;
+        const double offsetY = ((uav.id / 2) % 2 == 0) ? 1.2 : -1.2;
+        const Vec3 slotPos = targetStation->position + Vec3(offsetX, offsetY, 0.0);
+
         const double horizDist = std::hypot(uav.position.x - targetStation->position.x,
                                             uav.position.y - targetStation->position.y);
         if (horizDist > 15.0) {
-            uav.targetWaypoint = Vec3(targetStation->position.x, targetStation->position.y, rthAltitude);
+            uav.targetWaypoint = Vec3(slotPos.x, slotPos.y, rthAltitude);
         } else {
-            uav.targetWaypoint = targetStation->position;
+            uav.targetWaypoint = slotPos;
         }
 
         if (m_batteryModel.isInDockingRange(uav, *targetStation)) {

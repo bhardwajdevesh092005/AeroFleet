@@ -547,7 +547,7 @@ float Simulator::computeReward(const UAVState& uav, const UAVState& prevUav, boo
     float reward = -0.01f; // Living penalty to incentivize timely completion
 
     if (crashed) {
-        reward -= 100.0f;
+        reward -= 20.0f; // Calibrated penalty balanced with delivery reward
     }
 
     if (reached) {
@@ -580,17 +580,17 @@ float Simulator::computeNavigationReward(
 
     float reward = -0.01f + static_cast<float>(0.1 * progress);
     if (succeeded) reward += 10.0f;
-    if (failed) reward -= 100.0f;
+    if (failed) reward -= 10.0f;
 
-    // Continuous LiDAR proximity penalty to discourage flying within 3.5m of obstacles
+    // Gentle continuous LiDAR proximity penalty only in immediate clearance margin (< 1.5m)
     auto beams = computeLidarBeams(uav.position, uav.yaw, 100.0);
     float minBeam = 1.0f;
     for (float b : beams) {
         if (b < minBeam) minBeam = b;
     }
     double minObsDist = static_cast<double>(minBeam) * 100.0;
-    if (minObsDist < 3.5) {
-        reward -= static_cast<float>(0.4 * (3.5 - minObsDist));
+    if (minObsDist < 1.5) {
+        reward -= static_cast<float>(0.2 * (1.5 - minObsDist));
     }
 
     return reward;

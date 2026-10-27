@@ -91,6 +91,9 @@ bool BatteryModel::dock(UAVState& uav, ChargingStation& station) const {
     station.occupiedCount++;
     uav.mode = UAVMode::CHARGING;
     uav.isGrounded = true;
+    const double offsetX = (uav.id % 2 == 0) ? 1.2 : -1.2;
+    const double offsetY = ((uav.id / 2) % 2 == 0) ? 1.2 : -1.2;
+    uav.position = station.position + Vec3(offsetX, offsetY, 0.0);
     uav.velocity = Vec3(0.0, 0.0, 0.0);
     uav.acceleration = Vec3(0.0, 0.0, 0.0);
     return true;
@@ -105,7 +108,8 @@ bool BatteryModel::undock(UAVState& uav, ChargingStation& station) const {
 }
 
 bool BatteryModel::isInDockingRange(const UAVState& uav, const ChargingStation& station) const noexcept {
-    return uav.position.distanceSquared(station.position) <= (m_config.dockingRadius * m_config.dockingRadius);
+    const double captureRadius = m_config.dockingRadius + 1.5;
+    return uav.position.distanceSquared(station.position) <= (captureRadius * captureRadius);
 }
 
 } // namespace aerofleet
