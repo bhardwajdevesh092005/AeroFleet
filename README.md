@@ -36,7 +36,6 @@ AeroFleet formulates and solves this multi-agent logistics challenge using a **D
 AeroFleet/
 ├── CMakeLists.txt                  # Authoritative CMake build configuration with CTest harness
 ├── README.md                       # Comprehensive cross-platform documentation
-├── report.tex                      # 2-Page Descriptive Report in two-column Overleaf LaTeX
 ├── config/
 │   ├── simulation.json             # Authoritative 2000m x 2000m x 200m world configuration
 │   ├── training_nav.yaml           # Navigation PPO hyperparameters
@@ -317,8 +316,9 @@ To resolve the line-crossing deadlock pathology where UAVs previously braked to 
 
 ---
 
-## 8. Academic Deliverables & LaTeX Report
+## 8. Academic Deliverables & Verification
 
-- **2-Page Descriptive Report ([report.tex](file:///c:/Users/Prateek/Desktop/Coding/project/AeroFleet/report.tex))**: Complete two-column publication-grade report formatted for standard LaTeX and Overleaf, detailing the dual-tier RL architecture, $\tau$-gated lateral deconfliction, multi-slot infrastructure, and benchmark results.
 - **Authoritative C++ Core**: 100% compliant with 21 CTest suites.
 - **Zero-Discharge Idle Physics**: Landed and docked drones consume 0W, eliminating battery starvation while awaiting dispatch.
+- **Conflict-Free Flight Engine**: $\tau$-gated lateral right-hand passing maintaining full cruise speed without mid-air deadlocks.
+- **Dual-Tier Deep RL Policies**: MaskablePPO fleet coordinator and Continuous PPO navigation policies exported to high-throughput ONNX Runtime models.

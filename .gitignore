@@ -1,4 +1,4 @@
- # Prerequisites
+# Prerequisites
 *.d
 
 # Compiled Object files
@@ -56,6 +56,7 @@ compile_commands.json
 *.log
 *.bak
 *.swp
+*.swo
 
 # vcpkg
 vcpkg_installed/
@@ -67,10 +68,39 @@ vcpkg_installed/
 Testing/
 .cache/
 
-
+# Python artifacts and virtual environments
 __pycache__/
-.vscode/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .venv/
+venv/
+ENV/
+env/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# LaTeX and Report Artifacts
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+*.pdf
+*.tex
+*.png
+
+# Simulation outputs and runs
 logs/
 runs/
 third_party/
